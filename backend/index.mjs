@@ -15,13 +15,8 @@ function configuredOrigins() {
 function response(statusCode, body, origin, contentType = 'application/json; charset=utf-8', isBase64Encoded = false) {
   const headers = {
     'content-type': contentType,
-    'cache-control': 'no-store',
-    'access-control-allow-methods': 'POST, OPTIONS',
-    'access-control-allow-headers': 'content-type, x-tourguide-access-code',
-    'access-control-max-age': '600',
-    'vary': 'origin'
+    'cache-control': 'no-store'
   };
-  if (origin) headers['access-control-allow-origin'] = origin;
   return { statusCode, headers, body, isBase64Encoded };
 }
 
