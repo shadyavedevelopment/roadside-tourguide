@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Roadside Historian — Personal Audio Tour</title>
+
+  <!-- PWA Manifest & Theme -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+
+  <!-- iOS Safari Home Screen App Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Historian" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230f172a'/%3E%3Ccircle cx='256' cy='256' r='176' fill='none' stroke='%2338bdf8' stroke-width='28'/%3E%3Cpath d='M256 128v136l88 52' fill='none' stroke='%23f8fafc' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      margin: 0;
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)) 16px;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; gap: 16px; max-width: 600px; margin-inline: auto;
+    }
+    h1 { font-size: 1.35rem; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 0.75rem; padding: 4px 8px; border-radius: 999px;
+      background: #334155; color: var(--muted); font-weight: 600;
+    }
+    .badge.active { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .install-btn {
+      font-size: 0.75rem; padding: 5px 10px; border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2); color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 700; display: none;
+    }
+    .card {
+      background: var(--card); border-radius: 14px; padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 12px;
+    }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.9rem; font-weight: 700; color: var(--text);
+    }
+    label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 4px; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;
+      background: #0f172a; color: var(--text); font-size: 0.95rem;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button {
+      padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: 0.15s; background: var(--accent); color: #0f172a;
+    }
+    button:active { transform: scale(0.98); }
+    button.secondary { background: #334155; color: var(--text); }
+    button.danger { background: var(--danger); color: white; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .now-playing {
+      border-left: 4px solid var(--accent); padding-left: 12px;
+    }
+    .poi-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px 0; }
+    .poi-meta { font-size: 0.8rem; color: var(--accent); margin-bottom: 8px; }
+    .poi-script { font-size: 0.95rem; line-height: 1.5; color: #e2e8f0; margin: 0; }
+    .progress-wrap {
+      width: 100%; height: 6px; background: #0f172a; border-radius: 999px; overflow: hidden; display: none;
+    }
+    .progress-bar {
+      height: 100%; width: 0%; background: var(--accent); transition: width 0.25s ease;
+    }
+    .cache-status {
+      font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center;
+    }
+    .pill-offline {
+      font-size: 0.7rem; padding: 2px 7px; border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15); color: var(--accent); font-weight: 600;
+    }
+    details.cached-drawer {
+      background: #0f172a; border: 1px solid #334155; border-radius: 10px; overflow: hidden;
+    }
+    details.cached-drawer summary {
+      padding: 10px 12px; font-size: 0.85rem; font-weight: 600; color: var(--accent);
+      cursor: pointer; user-select: none; list-style: none; display: flex;
+      justify-content: space-between; align-items: center;
+    }
+    details.cached-drawer summary::-webkit-details-marker { display: none; }
+    details.cached-drawer summary::after {
+      content: "▸"; font-size: 0.9rem; transition: transform 0.15s ease;
+    }
+    details.cached-drawer[open] summary::after {
+      transform: rotate(90deg);
+    }
+    .cached-filter-wrap {
+      padding: 8px 10px; border-top: 1px solid #1e293b; background: #0b1120;
+    }
+    .cached-filter-wrap input {
+      padding: 8px 10px; font-size: 0.85rem; background: #0f172a; border-color: #334155;
+    }
+    .cached-list {
+      max-height: 240px; overflow-y: auto; border-top: 1px solid #1e293b;
+      display: flex; flex-direction: column;
+    }
+    .cached-empty {
+      padding: 14px 12px; font-size: 0.82rem; color: var(--muted); text-align: center;
+    }
+    .cached-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 10px 12px; background: transparent; color: var(--text); border-radius: 0;
+      border-bottom: 1px solid #1e293b; text-align: left; font-size: 0.88rem; font-weight: 500;
+    }
+    .cached-item:last-child { border-bottom: none; }
+    .cached-item:hover { background: #1e293b; }
+    .cached-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .cached-item-title {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;
+    }
+    .cached-item-sub { font-size: 0.74rem; color: var(--muted); }
+    .cached-item-tag {
+      flex-shrink: 0; font-size: 0.72rem; padding: 3px 8px; border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15); color: var(--accent); font-weight: 600;
+    }
+    .cached-item-tag.heard {
+      background: #1e293b; color: var(--muted);
+    }
+    .log {
+      font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.78rem;
+      color: var(--muted); max-height: 150px; overflow-y: auto; background: #0b1120;
+      padding: 10px; border-radius: 8px; white-space: pre-wrap;
+    }
+    audio { width: 100%; margin-top: 8px; height: 40px; }
+  </style>
+</head>
+<body>
+
+  <h1>
+    <span>Roadside Historian</span>
+    <div class="header-actions">
+      <button id="installBtn" class="install-btn" onclick="promptInstall()">+ Install App</button>
+      <span id="statusBadge" class="badge">Idle</span>
+    </div>
+  </h1>
+
+  <!-- Configuration Card -->
+  <div class="card">
+    <div>
+      <label for="apiKey">OpenAI API Key (optional — stored locally in browser)</label>
+      <input type="password" id="apiKey" placeholder="sk-... (leave blank for Free Offline TTS)" />
+    </div>
+    <div class="row">
+      <div>
+        <label for="radius">Search Radius (meters)</label>
+        <select id="radius">
+          <option value="1000">1,000 m (Walking)</option>
+          <option value="3000" selected>3,000 m (City Driving)</option>
+          <option value="8000">8,000 m (Highway)</option>
+        </select>
+      </div>
+      <div>
+        <label for="voice">Narrator Voice</label>
+        <select id="voice">
+          <option value="onyx">Onyx (Deep Storyteller)</option>
+          <option value="nova" selected>Nova (Warm Guide)</option>
+          <option value="fable">Fable (Expressive)</option>
+          <option value="browser">Free Browser TTS ($0 / Offline)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
+      <button id="scanNowBtn" class="secondary" onclick="manualScan()">Scan Now</button>
+    </div>
+  </div>
+
+  <!-- Offline Route Pre-Loader Card -->
+  <div class="card">
+    <div class="card-header">
+      <span>Offline Route Pre-Loader</span>
+      <span class="pill-offline" id="cacheCountBadge">0 cached POIs</span>
+    </div>
+    <div class="row">
+      <div>
+        <label for="routeStart">Start (blank = Current GPS)</label>
+        <input type="text" id="routeStart" placeholder="Current GPS location" />
+      </div>
+      <div>
+        <label for="routeEnd">Destination</label>
+        <input type="text" id="routeEnd" placeholder="e.g., Gettysburg, PA" />
+      </div>
+    </div>
+    <div id="preloadProgressWrap" class="progress-wrap">
+      <div id="preloadProgressBar" class="progress-bar"></div>
+    </div>
+    <div class="cache-status">
+      <span id="routeSummaryText">No offline route loaded yet.</span>
+    </div>
+
+    <!-- Collapsible List of Cached Landmarks with Search Filter -->
+    <details id="cachedDrawer" class="cached-drawer" style="display:none;">
+      <summary>
+        <span>Browse &amp; Preview Cached Landmarks</span>
+      </summary>
+      <div class="cached-filter-wrap">
+        <input type="search" id="cachedFilterInput" placeholder="Filter cached landmarks by name..." oninput="renderCachedList()" />
+      </div>
+      <div id="cachedList" class="cached-list"></div>
+    </details>
+
+    <div class="row">
+      <button id="preloadBtn" onclick="preloadRoute()">Pre-Load Route</button>
+      <button class="secondary" onclick="clearRouteCache()">Clear Cache</button>
+    </div>
+  </div>
+
+  <!-- Now Playing Card -->
+  <div class="card">
+    <div class="now-playing">
+      <div id="poiTitle" class="poi-title">Ready to explore</div>
+      <div id="poiMeta" class="poi-meta">Tap "Start Tour" or pre-load a route above</div>
+      <p id="poiScript" class="poi-script">
+        As you move, the app checks your pre-loaded route cache first (even without cell signal) or queries live Wikipedia historic landmarks ahead of your path, then reads a historical anecdote aloud.
+      </p>
+    </div>
+    <audio id="audioPlayer" controls></audio>
+    <div class="row">
+      <button class="secondary" onclick="skipCurrent()">Skip Story</button>
+      <button class="secondary" onclick="clearHistory()">Reset Heard List (<span id="heardCount">0</span>)</button>
+    </div>
+  </div>
+
+  <!-- Telemetry & Debug Log -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <label style="margin:0;">Live GPS & Pipeline Log</label>
+      <span id="gpsCoords" style="font-size:0.75rem; color:var(--accent);">No GPS lock</span>
+    </div>
+    <div id="logBox" class="log">Initialized. Waiting for start...</div>
+  </div>
+
+<script>
+  // --- PWA Service Worker & Install Prompt ---
+  let deferredInstallPrompt = null;
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => log('PWA offline app shell ready.'))
+        .catch((err) => log(`SW registration note: ${err.message}`));
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    document.getElementById('installBtn').style.display = 'inline-block';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    document.getElementById('installBtn').style.display = 'none';
+    log('App installed to home screen.');
+  });
+
+  async function promptInstall() {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      document.getElementById('installBtn').style.display = 'none';
+    }
+    deferredInstallPrompt = null;
+  }
+
+  // --- State & Storage ---
+  let isRunning = false;
+  let watchId = null;
+  let pollTimer = null;
+  let isProcessing = false;
+  let lastPosition = null;
+  let wakeLock = null;
+  let currentAudioBlobUrl = null;
+
+  const STORAGE_KEY_API = 'rh_openai_key';
+  const STORAGE_KEY_HEARD = 'rh_heard_pageids';
+  const STORAGE_KEY_CACHE = 'rh_route_cache';
+  const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
+
+  const apiKeyInput = document.getElementById('apiKey');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const logBox = document.getElementById('logBox');
+
+  apiKeyInput.value = localStorage.getItem(STORAGE_KEY_API) || '';
+  apiKeyInput.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEY_API, apiKeyInput.value.trim());
+  });
+  updateHeardCount();
+  updateCacheUI();
+
+  document.addEventListener('visibilitychange', () => {
+    if (isRunning && document.visibilityState === 'visible') {
+      requestWakeLock();
+    }
+  });
+
+  function getHeardSet() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_HEARD) || '[]'));
+    } catch { return new Set(); }
+  }
+
+  function markAsHeard(pageId) {
+    const set = getHeardSet();
+    set.add(pageId);
+    localStorage.setItem(STORAGE_KEY_HEARD, JSON.stringify([...set]));
+    updateHeardCount();
+    renderCachedList();
+  }
+
+  function clearHistory() {
+    localStorage.removeItem(STORAGE_KEY_HEARD);
+    updateHeardCount();
+    renderCachedList();
+    log('Cleared heard landmarks history.');
+  }
+
+  function updateHeardCount() {
+    document.getElementById('heardCount').textContent = getHeardSet().size;
+  }
+
+  function log(msg) {
+    const time = new Date().toLocaleTimeString([], { hour12: false });
+    logBox.textContent = `[${time}] ${msg}\n` + logBox.textContent;
+  }
+
+  // --- POI Quality Filtering & Historic Scoring ---
+  const GENERIC_TITLE_PATTERN = /\b(township|county|borough|municipality|unincorporated community|census-designated place|cdp|school district|shopping center|shopping mall|post office|interstate \d+|u\.s\. route \d+|state route \d+)\b/i;
+
+  const GENERIC_LEAD_PATTERN = /\b(is a|was a)\b[^.]{0,60}\b(census-designated place|unincorporated community|civil township|township in|borough in|county in|city in|town in|village in|hamlet in|municipality in|school district|shopping mall|strip mall|subway station|metro station|bus station)\b/i;
+
+  const SCHOOL_PATTERN = /\b(elementary school|middle school|high school|junior high|preparatory school|charter school|parochial school|catholic school|public school|private school|community college|technical college|schoolhouse|academy)\b/i;
+
+  const HISTORIC_BOOST_PATTERN = /\b(historic|historical|national register|battle|battlefield|monument|memorial|museum|fort|mansion|plantation|covered bridge|lighthouse|cemetery|ruins|archaeological|landmark|founded in 1[678]\d\d|built in 1[678]\d\d|18th-century|19th-century|colonial|civil war|revolutionary war)\b/i;
+
+  function isGenericPlace(title, extract = '') {
+    if (GENERIC_TITLE_PATTERN.test(title)) return true;
+
+    const firstSentence = extract ? (extract.split(/\.\s+/)[0] || '') : '';
+    if (firstSentence && GENERIC_LEAD_PATTERN.test(firstSentence)) return true;
+
+    // School check: allow ONLY if genuine historical significance is present
+    const isSchool = SCHOOL_PATTERN.test(title) || SCHOOL_PATTERN.test(firstSentence);
+    if (isSchool) {
+      if (!extract) {
+        return !HISTORIC_BOOST_PATTERN.test(title);
+      }
+      const combinedText = `${title} ${extract}`;
+      if (!HISTORIC_BOOST_PATTERN.test(combinedText)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function scoreLandmark(item) {
+    let score = 0;
+    const text = `${item.title} ${item.extract || ''}`;
+
+    const matches = text.match(new RegExp(HISTORIC_BOOST_PATTERN.source, 'gi'));
+    if (matches) score += Math.min(matches.length * 15, 60);
+
+    if (typeof item.dist === 'number') {
+      score += Math.max(0, 20 - (item.dist / 250));
+    }
+    return score;
+  }
+
+  // --- Offline Route Cache Helpers ---
+  function getRouteCache() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_CACHE) || '{}');
+    } catch { return {}; }
+  }
+
+  function saveRouteCache(cacheObj, routeSummary) {
+    try {
+      localStorage.setItem(STORAGE_KEY_CACHE, JSON.stringify(cacheObj));
+      if (routeSummary) {
+        localStorage.setItem(STORAGE_KEY_ROUTE_META, routeSummary);
+      }
+      updateCacheUI();
+    } catch (e) {
+      log(`Storage warning: ${e.message}. Try clearing old cache.`);
+    }
+  }
+
+  function clearRouteCache() {
+    localStorage.removeItem(STORAGE_KEY_CACHE);
+    localStorage.removeItem(STORAGE_KEY_ROUTE_META);
+    const filterInput = document.getElementById('cachedFilterInput');
+    if (filterInput) filterInput.value = '';
+    updateCacheUI();
+    log('Cleared offline route cache.');
+  }
+
+  function updateCacheUI() {
+    const cache = getRouteCache();
+    const count = Object.keys(cache).length;
+    document.getElementById('cacheCountBadge').textContent = `${count} cached POIs`;
+    const meta = localStorage.getItem(STORAGE_KEY_ROUTE_META);
+    document.getElementById('routeSummaryText').textContent =
+      count > 0 ? (meta || `${count} landmarks ready for offline playback.`) : 'No offline route loaded yet.';
+    renderCachedList();
+  }
+
+  function renderCachedList() {
+    const drawer = document.getElementById('cachedDrawer');
+    const listEl = document.getElementById('cachedList');
+    const filterInput = document.getElementById('cachedFilterInput');
+    const query = (filterInput ? filterInput.value : '').trim().toLowerCase();
+
+    const cache = getRouteCache();
+    const allItems = Object.values(cache)
+      .sort((a, b) => (a.routeOrder ?? 0) - (b.routeOrder ?? 0))
+      .map((item, idx) => ({ ...item, displayIndex: idx + 1 }));
+
+    if (allItems.length === 0) {
+      drawer.style.display = 'none';
+      drawer.open = false;
+      listEl.innerHTML = '';
+      return;
+    }
+
+    drawer.style.display = 'block';
+    const filteredItems = query
+      ? allItems.filter(item => item.title.toLowerCase().includes(query))
+      : allItems;
+
+    listEl.innerHTML = '';
+
+    if (filteredItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'cached-empty';
+      empty.textContent = `No cached landmarks match "${filterInput.value.trim()}".`;
+      listEl.appendChild(empty);
+      return;
+    }
+
+    const heard = getHeardSet();
+
+    filteredItems.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cached-item';
+      btn.onclick = () => playCachedLandmark(item.pageid);
+
+      const info = document.createElement('div');
+      info.className = 'cached-item-info';
+
+      const title = document.createElement('div');
+      title.className = 'cached-item-title';
+      title.textContent = `${item.displayIndex}. ${item.title}`;
+
+      const sub = document.createElement('div');
+      sub.className = 'cached-item-sub';
+      const distText = lastPosition
+        ? `${Math.round(haversineMeters(lastPosition.coords.latitude, lastPosition.coords.longitude, item.lat, item.lon))}m away`
+        : `${item.lat.toFixed(3)}, ${item.lon.toFixed(3)}`;
+      sub.textContent = `${distText} • Tap to play story`;
+
+      info.appendChild(title);
+      info.appendChild(sub);
+
+      const tag = document.createElement('span');
+      const isHeard = heard.has(item.pageid);
+      tag.className = `cached-item-tag${isHeard ? ' heard' : ''}`;
+      tag.textContent = isHeard ? 'Heard' : 'Play ▶';
+
+      btn.appendChild(info);
+      btn.appendChild(tag);
+      listEl.appendChild(btn);
+    });
+  }
+
+  async function playCachedLandmark(pageId) {
+    const cache = getRouteCache();
+    const target = cache[pageId];
+    if (!target) return;
+
+    if (isProcessing) {
+      log('Busy processing another landmark—try again in a moment.');
+      return;
+    }
+
+    isProcessing = true;
+    try {
+      skipCurrent();
+      log(`Previewing cached landmark: "${target.title}"...`);
+
+      let distanceMeters = null;
+      let relativeDir = 'along your route';
+
+      if (lastPosition) {
+        distanceMeters = Math.round(
+          haversineMeters(lastPosition.coords.latitude, lastPosition.coords.longitude, target.lat, target.lon)
+        );
+        relativeDir = getRelativeDirection(lastPosition.coords, target.lat, target.lon);
+      }
+
+      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, target.extract);
+
+      const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
+      const distLabel = distanceMeters !== null ? `${distanceMeters}m away • ` : '';
+      document.getElementById('poiTitle').textContent = target.title;
+      document.getElementById('poiMeta').textContent = `${capDir} • ${distLabel}Cached Route Preview`;
+      document.getElementById('poiScript').textContent = script;
+      updateMediaSession(target.title, script);
+
+      markAsHeard(target.pageid);
+      await speakText(script);
+    } catch (err) {
+      log(`Preview error: ${err.message}`);
+    } finally {
+      isProcessing = false;
+    }
+  }
+
+  // --- Route Pre-Loader ---
+  async function geocodePlace(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
+    const data = await res.json();
+    if (!data || data.length === 0) throw new Error(`Could not find location: "${query}"`);
+    return {
+      lat: parseFloat(data[0].lat),
+      lon: parseFloat(data[0].lon),
+      name: data[0].display_name.split(',')[0]
+    };
+  }
+
+  function getCurrentGpsPromise() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Geolocation not supported.'));
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          lastPosition = pos;
+          updateGpsDisplay(pos.coords);
+          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, name: 'Current Location' });
+        },
+        (err) => reject(new Error(`GPS Error: ${err.message}`)),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  }
+
+  function sampleRouteCoordinates(coordsLonLat, stepMeters = 6000) {
+    if (!coordsLonLat || coordsLonLat.length === 0) return [];
+    const samples = [{ lat: coordsLonLat[0][1], lon: coordsLonLat[0][0] }];
+    let accum = 0;
+
+    for (let i = 1; i < coordsLonLat.length; i++) {
+      const [lon1, lat1] = coordsLonLat[i - 1];
+      const [lon2, lat2] = coordsLonLat[i];
+      const segDist = haversineMeters(lat1, lon1, lat2, lon2);
+      accum += segDist;
+      if (accum >= stepMeters) {
+        samples.push({ lat: lat2, lon: lon2 });
+        accum = 0;
+      }
+    }
+
+    const last = coordsLonLat[coordsLonLat.length - 1];
+    samples.push({ lat: last[1], lon: last[0] });
+    return samples;
+  }
+
+  async function preloadRoute() {
+    const startText = document.getElementById('routeStart').value.trim();
+    const endText = document.getElementById('routeEnd').value.trim();
+    if (!endText) {
+      alert('Please enter a destination (e.g., "Gettysburg, PA").');
+      return;
+    }
+
+    const btn = document.getElementById('preloadBtn');
+    const progWrap = document.getElementById('preloadProgressWrap');
+    const progBar = document.getElementById('preloadProgressBar');
+
+    btn.disabled = true;
+    btn.textContent = 'Pre-Loading...';
+    progWrap.style.display = 'block';
+    progBar.style.width = '5%';
+
+    try {
+      log(`Resolving route endpoints...`);
+      const startPt = startText ? await geocodePlace(startText) : await getCurrentGpsPromise();
+      progBar.style.width = '15%';
+      const endPt = await geocodePlace(endText);
+      progBar.style.width = '25%';
+
+      log(`Calculating driving route: ${startPt.name} -> ${endPt.name}...`);
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startPt.lon},${startPt.lat};${endPt.lon},${endPt.lat}?overview=full&geometries=geojson`;
+      const routeRes = await fetch(osrmUrl);
+      if (!routeRes.ok) throw new Error('Routing service unavailable.');
+      const routeData = await routeRes.json();
+      if (!routeData.routes || routeData.routes.length === 0) {
+        throw new Error('No driving route found between those locations.');
+      }
+
+      const route = routeData.routes[0];
+      const miles = (route.distance * 0.000621371).toFixed(1);
+      let checkpoints = sampleRouteCoordinates(route.geometry.coordinates, 6000);
+      if (checkpoints.length > 45) {
+        const stride = Math.ceil(checkpoints.length / 45);
+        checkpoints = checkpoints.filter((_, idx) => idx % stride === 0 || idx === checkpoints.length - 1);
+      }
+
+      log(`Route is ${miles} mi (${checkpoints.length} scan checkpoints). Fetching Wikipedia POIs...`);
+      progBar.style.width = '35%';
+
+      const discovered = new Map();
+      const searchRadius = Math.max(Number(document.getElementById('radius').value), 5000);
+      let orderCounter = 0;
+
+      for (let i = 0; i < checkpoints.length; i++) {
+        const pt = checkpoints[i];
+        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${pt.lat}|${pt.lon}&gsradius=${searchRadius}&gslimit=25&format=json&origin=*`;
+        const res = await fetch(wikiUrl);
+        const data = await res.json();
+        const items = data?.query?.geosearch || [];
+        for (const item of items) {
+          if (!discovered.has(item.pageid) && !isGenericPlace(item.title)) {
+            discovered.set(item.pageid, {
+              pageid: item.pageid,
+              title: item.title,
+              lat: item.lat,
+              lon: item.lon,
+              routeOrder: orderCounter++
+            });
+          }
+        }
+        const pct = 35 + Math.round(((i + 1) / checkpoints.length) * 35);
+        progBar.style.width = `${pct}%`;
+      }
+
+      const allIds = [...discovered.keys()];
+      log(`Found ${allIds.length} candidate landmarks. Filtering & downloading summaries...`);
+
+      const cache = {};
+      let addedCount = 0;
+
+      for (let i = 0; i < allIds.length; i += 20) {
+        const batchIds = allIds.slice(i, i + 20);
+        const extUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${batchIds.join('|')}&format=json&origin=*`;
+        const extRes = await fetch(extUrl);
+        const extData = await extRes.json();
+        const pages = extData?.query?.pages || {};
+
+        for (const id of batchIds) {
+          const extract = pages[id]?.extract || '';
+          const meta = discovered.get(id);
+          if (extract && extract.length >= 60 && !isGenericPlace(meta.title, extract)) {
+            cache[id] = {
+              pageid: id,
+              title: meta.title,
+              lat: meta.lat,
+              lon: meta.lon,
+              routeOrder: meta.routeOrder,
+              extract: extract.slice(0, 1800)
+            };
+            addedCount++;
+          }
+        }
+        const pct = 70 + Math.round(((i + batchIds.length) / Math.max(allIds.length, 1)) * 30);
+        progBar.style.width = `${pct}%`;
+      }
+
+      const summary = `${startPt.name} → ${endPt.name} (${miles} mi)`;
+      saveRouteCache(cache, summary);
+      log(`Pre-load complete! Cached ${addedCount} historic landmarks for "${summary}".`);
+
+    } catch (err) {
+      log(`Pre-load error: ${err.message}`);
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Pre-Load Route';
+      setTimeout(() => {
+        progWrap.style.display = 'none';
+        progBar.style.width = '0%';
+      }, 1200);
+    }
+  }
+
+  // --- Tour Lifecycle ---
+  async function toggleTour() {
+    const btn = document.getElementById('toggleBtn');
+    const badge = document.getElementById('statusBadge');
+
+    if (!isRunning) {
+      if (!apiKeyInput.value.trim() && document.getElementById('voice').value !== 'browser') {
+        log('No OpenAI API key set — defaulting to Free Browser TTS.');
+      }
+      isRunning = true;
+      btn.textContent = 'Stop Tour';
+      btn.classList.add('danger');
+      badge.textContent = 'Active';
+      badge.classList.add('active');
+
+      // Unlock iOS/mobile audio context on user tap using tiny silent WAV
+      audioPlayer.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      audioPlayer.play().catch(() => {});
+      await requestWakeLock();
+
+      startGpsTracking();
+      pollTimer = setInterval(() => {
+        if (lastPosition && !isProcessing && audioPlayer.paused && !window.speechSynthesis.speaking) {
+          checkNearbyLandmarks(lastPosition.coords);
+        }
+      }, 25000);
+    } else {
+      isRunning = false;
+      btn.textContent = 'Start Tour';
+      btn.classList.remove('danger');
+      badge.textContent = 'Idle';
+      badge.classList.remove('active');
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      clearInterval(pollTimer);
+      await releaseWakeLock();
+      skipCurrent();
+      log('Tour stopped.');
+    }
+  }
+
+  function manualScan() {
+    if (!navigator.geolocation) return alert('Geolocation not supported.');
+    log('Requesting immediate GPS fix...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        lastPosition = pos;
+        updateGpsDisplay(pos.coords);
+        checkNearbyLandmarks(pos.coords);
+      },
+      (err) => log(`GPS Error: ${err.message}`),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function startGpsTracking() {
+    if (!navigator.geolocation) {
+      log('Geolocation is not supported by this browser.');
+      return;
+    }
+    log('Starting high-accuracy GPS tracking...');
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const firstFix = !lastPosition;
+        lastPosition = pos;
+        updateGpsDisplay(pos.coords);
+        if (firstFix) {
+          renderCachedList();
+          checkNearbyLandmarks(pos.coords);
+        }
+      },
+      (err) => log(`GPS Watch Error: ${err.message}`),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
+
+  function updateGpsDisplay(coords) {
+    const mph = coords.speed ? (coords.speed * 2.23694).toFixed(0) : '0';
+    const hdg = coords.heading !== null && !isNaN(coords.heading) ? `${Math.round(coords.heading)}°` : 'N/A';
+    document.getElementById('gpsCoords').textContent =
+      `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} • ${mph} mph • Hdg ${hdg}`;
+  }
+
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
+      }
+    } catch (e) {}
+  }
+
+  async function releaseWakeLock() {
+    try {
+      if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+    } catch (e) {
+      wakeLock = null;
+    }
+  }
+
+  // --- Geospatial Math ---
+  function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = (deg) => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function calculateBearing(lat1, lon1, lat2, lon2) {
+    const toRad = (deg) => deg * Math.PI / 180;
+    const toDeg = (rad) => rad * 180 / Math.PI;
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  function signedAngleDifference(heading, bearing) {
+    return ((bearing - heading + 540) % 360) - 180;
+  }
+
+  function getRelativeDirection(coords, targetLat, targetLon) {
+    const bearing = calculateBearing(coords.latitude, coords.longitude, targetLat, targetLon);
+
+    if (coords.heading === null || isNaN(coords.heading) || (coords.speed !== null && coords.speed < 1.5)) {
+      const cardinals = ['to the north', 'to the northeast', 'to the east', 'to the southeast',
+                         'to the south', 'to the southwest', 'to the west', 'to the northwest'];
+      const idx = Math.round(bearing / 45) % 8;
+      return cardinals[idx];
+    }
+
+    const delta = signedAngleDifference(coords.heading, bearing);
+    const absDelta = Math.abs(delta);
+    const side = delta < 0 ? 'left' : 'right';
+
+    if (absDelta <= 20) return 'straight ahead';
+    if (absDelta <= 65) return `ahead on your ${side}`;
+    if (absDelta <= 115) return `off to your ${side}`;
+    return `just behind you on your ${side}`;
+  }
+
+  // --- Core Pipeline ---
+  async function checkNearbyLandmarks(coords) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    try {
+      const radius = Number(document.getElementById('radius').value);
+      const heard = getHeardSet();
+      const routeCache = getRouteCache();
+
+      let candidates = Object.values(routeCache)
+        .filter(item => !heard.has(item.pageid) && !isGenericPlace(item.title, item.extract))
+        .map(item => ({
+          ...item,
+          dist: haversineMeters(coords.latitude, coords.longitude, item.lat, item.lon),
+          fromCache: true
+        }))
+        .filter(item => item.dist <= radius)
+        .sort((a, b) => a.dist - b.dist);
+
+      if (candidates.length === 0) {
+        if (!navigator.onLine) {
+          log('Offline and no cached landmarks within current radius.');
+          isProcessing = false;
+          return;
+        }
+        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=${radius}&gslimit=25&format=json&origin=*`;
+        log(`Querying live Wikipedia within ${radius}m...`);
+        const res = await fetch(wikiUrl);
+        const data = await res.json();
+        const results = data?.query?.geosearch || [];
+        candidates = results
+          .filter(item => !heard.has(item.pageid) && !isGenericPlace(item.title))
+          .map(item => ({ ...item, fromCache: false }));
+      } else {
+        log(`Matched ${candidates.length} landmarks from offline route cache.`);
+      }
+
+      if (candidates.length === 0) {
+        log('No unheard historic landmarks nearby.');
+        isProcessing = false;
+        return;
+      }
+
+      if (coords.speed && coords.speed > 2.2 && coords.heading !== null && !isNaN(coords.heading)) {
+        const ahead = candidates.filter(c => {
+          const bearing = calculateBearing(coords.latitude, coords.longitude, c.lat, c.lon);
+          return Math.abs(signedAngleDifference(coords.heading, bearing)) <= 75;
+        });
+        if (ahead.length > 0) {
+          candidates = ahead;
+          log(`Filtered to ${ahead.length} landmarks ahead of driving direction.`);
+        }
+      }
+
+      // Rank by historical relevance + proximity
+      candidates.sort((a, b) => scoreLandmark(b) - scoreLandmark(a));
+
+      let target = null;
+      let extract = '';
+
+      for (const candidate of candidates) {
+        let candidateExtract = candidate.extract || '';
+        if (!candidateExtract) {
+          const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${candidate.pageid}&format=json&origin=*`;
+          const extRes = await fetch(extractUrl);
+          const extData = await extRes.json();
+          candidateExtract = extData?.query?.pages?.[candidate.pageid]?.extract || '';
+        }
+
+        if (!candidateExtract || candidateExtract.length < 60 || isGenericPlace(candidate.title, candidateExtract)) {
+          log(`Skipping generic/non-historic entry: "${candidate.title}"`);
+          markAsHeard(candidate.pageid);
+          continue;
+        }
+
+        target = candidate;
+        extract = candidateExtract;
+        break;
+      }
+
+      if (!target) {
+        log('No qualifying historic landmarks found in this scan.');
+        isProcessing = false;
+        return;
+      }
+
+      const distanceMeters = Math.round(target.dist);
+      const relativeDir = getRelativeDirection(coords, target.lat, target.lon);
+      log(`Selected: "${target.title}" (${distanceMeters}m, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
+
+      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract);
+
+      const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
+      const sourceTag = target.fromCache ? 'Offline Route Cache' : 'Live Wikipedia';
+      document.getElementById('poiTitle').textContent = target.title;
+      document.getElementById('poiMeta').textContent = `${capDir} • ${distanceMeters}m away • ${sourceTag}`;
+      document.getElementById('poiScript').textContent = script;
+      updateMediaSession(target.title, script);
+
+      markAsHeard(target.pageid);
+      await speakText(script);
+
+    } catch (err) {
+      log(`Pipeline error: ${err.message}`);
+    } finally {
+      isProcessing = false;
+    }
+  }
+
+  // Strips Wikipedia's opening "located in City, State, United States" boilerplate
+  function cleanWikiSummary(wikiExtract) {
+    const sentences = wikiExtract
+      .replace(/\b(St|Dr|Mr|Mrs|Ms|Gen|Col|Capt|Gov|Sen|Rep|Rev|U\.S)\./g, '$1<PRD>')
+      .split(/\.\s+/)
+      .map(s => s.replace(/<PRD>/g, '.').trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 1) return wikiExtract;
+
+    const locationBoilerplate = /\b(is a|was a|are a)\b.*\b(located in|situated in|unincorporated community in|census-designated place in|town in|city in|borough in|village in|township in|county in|neighborhood in|district in)\b/i;
+
+    const startIndex = locationBoilerplate.test(sentences[0]) ? 1 : 0;
+    const picked = sentences.slice(startIndex, startIndex + 2);
+
+    return (picked.length > 0 ? picked : sentences.slice(0, 2)).join('. ') + '.';
+  }
+
+  async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract) {
+    const key = apiKeyInput.value.trim();
+    const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
+
+    if (!key || !navigator.onLine) {
+      const summary = cleanWikiSummary(wikiExtract);
+      return `${capDir} is ${title}. ${summary}`;
+    }
+
+    const distPhrase = distanceMeters !== null ? ` (${distanceMeters} meters away)` : '';
+
+    try {
+      log('Generating AI tour script via gpt-4o-mini...');
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          temperature: 0.7,
+          max_tokens: 180,
+          messages: [
+            {
+              role: 'system',
+              content: [
+                'You are a witty, engaging radio tour guide narrating for a driver passing a landmark.',
+                'Start by naturally orienting the driver using the provided relative direction (e.g., "Ahead on your left..."), then share a punchy 3-sentence spoken anecdote (max 65 words total) highlighting the most surprising historical fact.',
+                'CRITICAL: The listener is already driving right past it—NEVER mention the city, county, state, province, or country it is located in (e.g., skip "located in Pennsylvania, United States"). Jump straight into what makes it interesting.',
+                'Never say "As you can see in this photo" or use markdown/bullet points.'
+              ].join(' ')
+            },
+            {
+              role: 'user',
+              content: `Landmark: ${title}\nLocation relative to driver: ${relativeDir}${distPhrase}\nFacts: ${wikiExtract.slice(0, 1500)}`
+            }
+          ]
+        })
+      });
+
+      if (!response.ok) throw new Error(`OpenAI Chat API error (${response.status})`);
+      const data = await response.json();
+      return data.choices[0].message.content.trim();
+    } catch (err) {
+      log(`AI script fallback (${err.message})`);
+      const summary = cleanWikiSummary(wikiExtract);
+      return `${capDir} is ${title}. ${summary}`;
+    }
+  }
+
+  function cleanupAudioBlob() {
+    if (currentAudioBlobUrl) {
+      URL.revokeObjectURL(currentAudioBlobUrl);
+      currentAudioBlobUrl = null;
+    }
+  }
+
+  async function speakText(text) {
+    const voice = document.getElementById('voice').value;
+    const key = apiKeyInput.value.trim();
+
+    if (voice === 'browser' || !key || !navigator.onLine) {
+      log('Speaking via built-in offline browser TTS...');
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.02;
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+
+    try {
+      log(`Generating OpenAI TTS audio (${voice})...`);
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: voice,
+          input: text
+        })
+      });
+
+      if (!response.ok) throw new Error(`OpenAI TTS API error (${response.status})`);
+      const blob = await response.blob();
+
+      cleanupAudioBlob();
+      currentAudioBlobUrl = URL.createObjectURL(blob);
+
+      audioPlayer.src = currentAudioBlobUrl;
+      await audioPlayer.play();
+      log('Playing audio narration.');
+    } catch (err) {
+      log(`TTS fallback to browser voice (${err.message})`);
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.02;
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  function skipCurrent() {
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    cleanupAudioBlob();
+    window.speechSynthesis.cancel();
+    log('Skipped current narration.');
+  }
+
+  function updateMediaSession(title, script) {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: title,
+        artist: 'Roadside Historian',
+        album: 'Self-Guided Audio Tour'
+      });
+      navigator.mediaSession.setActionHandler('play', () => audioPlayer.play());
+      navigator.mediaSession.setActionHandler('pause', () => audioPlayer.pause());
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        skipCurrent();
+        if (lastPosition) checkNearbyLandmarks(lastPosition.coords);
+      });
+    }
+  }
+</script>
+</body>
+</html>
