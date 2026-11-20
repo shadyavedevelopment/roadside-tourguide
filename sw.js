@@ -1,70 +1,58 @@
-const CACHE_NAME = 'roadside-historian-v1';
+const CACHE_NAME = 'roadside-tourguide-v1';
 const APP_SHELL = [
-  './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon.svg'
 ];
 
-// Pre-cache the app shell on install
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(APP_SHELL);
+    await self.skipWaiting();
+  })());
 });
 
-// Clean up outdated caches on activate
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames
+      .filter((name) => name.startsWith('roadside-tourguide-') && name !== CACHE_NAME)
+      .map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
-// Serve app shell offline; bypass cache for external APIs
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-
-  if (request.method !== 'GET') return;
-
+  const request = event.request;
   const url = new URL(request.url);
 
-  // External APIs (Wikipedia, OpenAI, OSRM, Nominatim) are handled by the app's own localStorage cache
-  if (url.origin !== self.location.origin) {
-    return;
-  }
+  // Leave cross-origin services (such as Wikipedia and OpenAI) to the browser.
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Navigation requests fallback to cached index.html when offline
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
-
-  // Same-origin static assets: Cache-First with network update
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response && response.status === 200) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put('./index.html', response.clone());
         }
         return response;
-      });
-    })
-  );
+      } catch {
+        return (await caches.match('./index.html')) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  event.respondWith((async () => {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    try {
+      return await fetch(request);
+    } catch {
+      return Response.error();
+    }
+  })());
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Roadside Historian — Personal Audio Tour</title>
+  <title>Roadside Tourguide — Personal Audio Tour</title>
 
   <!-- PWA Manifest & Theme -->
   <link rel="manifest" href="./manifest.json" />
@@ -12,7 +12,7 @@
   <!-- iOS Safari Home Screen App Support -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Historian" />
+  <meta name="apple-mobile-web-app-title" content="Tourguide" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230f172a'/%3E%3Ccircle cx='256' cy='256' r='176' fill='none' stroke='%2338bdf8' stroke-width='28'/%3E%3Cpath d='M256 128v136l88 52' fill='none' stroke='%23f8fafc' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 
   <style>
@@ -145,7 +145,7 @@
 <body>
 
   <h1>
-    <span>Roadside Historian</span>
+    <span>Roadside Tourguide</span>
     <div class="header-actions">
       <button id="installBtn" class="install-btn" onclick="promptInstall()">+ Install App</button>
       <span id="statusBadge" class="badge">Idle</span>
@@ -1100,7 +1100,7 @@
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: title,
-        artist: 'Roadside Historian',
+        artist: 'Roadside Tourguide',
         album: 'Self-Guided Audio Tour'
       });
       navigator.mediaSession.setActionHandler('play', () => audioPlayer.play());
