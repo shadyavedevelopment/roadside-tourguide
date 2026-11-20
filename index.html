@@ -60,6 +60,18 @@
       background: #0f172a; color: var(--text); font-size: 0.95rem;
     }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .site-category-settings {
+      border: 1px solid #334155; border-radius: 10px; padding: 10px 12px;
+      margin: 0; min-width: 0;
+    }
+    .site-category-settings legend { padding: 0 5px; font-size: 0.8rem; color: var(--muted); }
+    .site-category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    .site-category-option {
+      display: flex; align-items: center; gap: 7px; margin: 0;
+      color: var(--text); font-size: 0.78rem; line-height: 1.25;
+    }
+    .site-category-option input { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--accent); }
+    .setting-hint { margin: 8px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
     button {
       padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
       cursor: pointer; transition: 0.15s; background: var(--accent); color: #0f172a;
@@ -160,10 +172,12 @@
     </div>
     <div class="row">
       <div>
-        <label for="radius">Search Radius (meters)</label>
+        <label for="radius">Search Range</label>
         <select id="radius">
-          <option value="1000">1,000 m (Walking)</option>
-          <option value="3000" selected>3,000 m (City Driving)</option>
+          <option value="auto" selected>Automatic by speed (500 m walk · 1 km city · 8 km highway)</option>
+          <option value="500">500 m (Close range)</option>
+          <option value="1000">1,000 m (City)</option>
+          <option value="3000">3,000 m</option>
           <option value="8000">8,000 m (Highway)</option>
         </select>
       </div>
@@ -177,6 +191,19 @@
         </select>
       </div>
     </div>
+    <fieldset class="site-category-settings">
+      <legend>Include these types of places</legend>
+      <div class="site-category-grid">
+        <label class="site-category-option"><input type="checkbox" data-site-category="historic" checked /> Historic buildings &amp; districts</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="museums" checked /> Museums, monuments &amp; memorials</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="military" checked /> Battles &amp; military history</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="transport" checked /> Transportation &amp; industry</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="people" checked /> People, arts &amp; culture</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="nature" checked /> Natural landmarks &amp; parks</label>
+        <label class="site-category-option"><input type="checkbox" data-site-category="other" /> Other notable places</label>
+      </div>
+      <p class="setting-hint">Choose one or more. The app favors well-known, historically significant sites nearby and skips ordinary places.</p>
+    </fieldset>
     <div class="row">
       <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
       <button id="scanNowBtn" class="secondary" onclick="manualScan()">Scan Now</button>
@@ -229,7 +256,7 @@
       <div id="poiTitle" class="poi-title">Ready to explore</div>
       <div id="poiMeta" class="poi-meta">Tap "Start Tour" or pre-load a route above</div>
       <p id="poiScript" class="poi-script">
-        As you move, the app checks your pre-loaded route cache first (even without cell signal) or queries live Wikipedia historic landmarks ahead of your path, then reads a historical anecdote aloud.
+        The tour favors notable places in your selected categories and adapts its search range to your pace. It chooses one nearby story at a time and keeps the narration focused on worthwhile facts.
       </p>
     </div>
     <audio id="audioPlayer" controls></audio>
@@ -295,15 +322,45 @@
   const STORAGE_KEY_HEARD = 'rh_heard_pageids';
   const STORAGE_KEY_CACHE = 'rh_route_cache';
   const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
+  const STORAGE_KEY_CATEGORIES = 'rh_site_categories';
+  const STORAGE_KEY_RADIUS = 'rh_search_radius';
+
+  const SITE_CATEGORY_RULES = {
+    historic: /\b(historic|historical|architecture|architectural|national register|historic district|historic house|mansion|estate|castle|cathedral|church|courthouse|lighthouse|cemetery|plantation|ruins|archaeological|colonial|landmark)\b/i,
+    museums: /\b(museum|monument|memorial|memorialized|statue|hall of fame|heritage center)\b/i,
+    military: /\b(battle|battlefield|war|military|fort|fortress|arsenal|siege|regiment|campaign|revolutionary|civil war)\b/i,
+    transport: /\b(railroad|railway|train station|railway station|depot|canal|bridge|viaduct|factory|mill|mine|industrial|shipyard|airport|seaport|port|dam|power plant|locomotive)\b/i,
+    people: /\b(birthplace|born in|author|poet|composer|artist|sculptor|writer|president|inventor|activist|actor|musician|cultural|theatre|theater|opera|film|house of|home of)\b/i,
+    nature: /\b(national park|state park|park|waterfall|mountain|river|lake|forest|cave|island|garden|arboretum|geological|natural landmark|nature reserve|preserve|wildlife refuge)\b/i
+  };
 
   const apiKeyInput = document.getElementById('apiKey');
   const audioPlayer = document.getElementById('audioPlayer');
   const logBox = document.getElementById('logBox');
+  const radiusInput = document.getElementById('radius');
+  const siteCategoryInputs = [...document.querySelectorAll('[data-site-category]')];
 
   apiKeyInput.value = localStorage.getItem(STORAGE_KEY_API) || '';
   apiKeyInput.addEventListener('change', () => {
     localStorage.setItem(STORAGE_KEY_API, apiKeyInput.value.trim());
   });
+
+  const savedRadius = localStorage.getItem(STORAGE_KEY_RADIUS);
+  if (savedRadius && [...radiusInput.options].some(option => option.value === savedRadius)) {
+    radiusInput.value = savedRadius;
+  }
+  radiusInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_RADIUS, radiusInput.value));
+
+  try {
+    const savedCategories = JSON.parse(localStorage.getItem(STORAGE_KEY_CATEGORIES) || 'null');
+    if (Array.isArray(savedCategories)) {
+      siteCategoryInputs.forEach(input => { input.checked = savedCategories.includes(input.dataset.siteCategory); });
+    }
+  } catch {}
+  siteCategoryInputs.forEach(input => input.addEventListener('change', () => {
+    const selected = siteCategoryInputs.filter(item => item.checked).map(item => item.dataset.siteCategory);
+    localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(selected));
+  }));
   updateHeardCount();
   updateCacheUI();
 
@@ -351,6 +408,45 @@
   const SCHOOL_PATTERN = /\b(elementary school|middle school|high school|junior high|preparatory school|charter school|parochial school|catholic school|public school|private school|community college|technical college|schoolhouse|academy)\b/i;
 
   const HISTORIC_BOOST_PATTERN = /\b(historic|historical|national register|battle|battlefield|monument|memorial|museum|fort|mansion|plantation|covered bridge|lighthouse|cemetery|ruins|archaeological|landmark|founded in 1[678]\d\d|built in 1[678]\d\d|18th-century|19th-century|colonial|civil war|revolutionary war)\b/i;
+  const NATIONAL_SIGNIFICANCE_PATTERN = /\b(unesco|world heritage|national historic landmark|national register of historic places|national monument|national park|national memorial)\b/gi;
+  const NOTABLE_FACT_PATTERN = /\b(oldest|first|only|largest|oldest-surviving|first-ever|birthplace|headquarters|turning point|decisive)\b/gi;
+  const SITE_CATEGORY_LABELS = {
+    historic: 'historic buildings and districts',
+    museums: 'museums, monuments, and memorials',
+    military: 'battles and military history',
+    transport: 'transportation and industry',
+    people: 'people, arts, and culture',
+    nature: 'natural landmarks and parks',
+    other: 'other notable places'
+  };
+
+  function getSelectedSiteCategories() {
+    return new Set(siteCategoryInputs.filter(input => input.checked).map(input => input.dataset.siteCategory));
+  }
+
+  function getSiteCategoryMatches(title, extract = '') {
+    const text = `${title} ${extract.slice(0, 500)}`;
+    return Object.entries(SITE_CATEGORY_RULES)
+      .filter(([, pattern]) => pattern.test(text))
+      .map(([category]) => category);
+  }
+
+  function matchesSelectedSiteCategories(title, extract = '') {
+    const selected = getSelectedSiteCategories();
+    if (selected.size === 0) return false;
+    const matches = getSiteCategoryMatches(title, extract);
+    return matches.some(category => selected.has(category)) || (matches.length === 0 && selected.has('other'));
+  }
+
+  function getSearchRadiusMeters(coords = null) {
+    const choice = radiusInput.value;
+    if (choice !== 'auto') return Number(choice);
+
+    const speed = Number.isFinite(coords?.speed) ? coords.speed : 0;
+    if (speed < 6.7) return 500;       // walking or slow local movement
+    if (speed < 22.2) return 1000;     // city streets and ordinary roads
+    return 8000;                       // expressway speeds: broader-area stories
+  }
 
   function isGenericPlace(title, extract = '') {
     if (GENERIC_TITLE_PATTERN.test(title)) return true;
@@ -373,17 +469,24 @@
     return false;
   }
 
-  function scoreLandmark(item) {
-    let score = 0;
+  function scoreLandmark(item, radiusMeters = 3000) {
+    let importance = 0;
     const text = `${item.title} ${item.extract || ''}`;
 
-    const matches = text.match(new RegExp(HISTORIC_BOOST_PATTERN.source, 'gi'));
-    if (matches) score += Math.min(matches.length * 15, 60);
+    const significantMatches = text.match(NATIONAL_SIGNIFICANCE_PATTERN);
+    if (significantMatches) importance += Math.min(significantMatches.length * 30, 60);
 
-    if (typeof item.dist === 'number') {
-      score += Math.max(0, 20 - (item.dist / 250));
-    }
-    return score;
+    const historicMatches = text.match(new RegExp(HISTORIC_BOOST_PATTERN.source, 'gi'));
+    if (historicMatches) importance += Math.min(historicMatches.length * 8, 32);
+
+    const notableFacts = text.match(NOTABLE_FACT_PATTERN);
+    if (notableFacts) importance += Math.min(notableFacts.length * 7, 21);
+    if ((item.extract || '').length > 600) importance += 5;
+
+    const proximity = typeof item.dist === 'number'
+      ? Math.max(0, 30 * (1 - Math.min(item.dist / Math.max(radiusMeters, 1), 1)))
+      : 0;
+    return importance + proximity;
   }
 
   // --- Offline Route Cache Helpers ---
@@ -631,7 +734,8 @@
       progBar.style.width = '35%';
 
       const discovered = new Map();
-      const searchRadius = Math.max(Number(document.getElementById('radius').value), 5000);
+      const configuredRadius = radiusInput.value === 'auto' ? 8000 : Number(radiusInput.value);
+      const searchRadius = Math.max(configuredRadius, 5000);
       let orderCounter = 0;
 
       for (let i = 0; i < checkpoints.length; i++) {
@@ -671,7 +775,7 @@
         for (const id of batchIds) {
           const extract = pages[id]?.extract || '';
           const meta = discovered.get(id);
-          if (extract && extract.length >= 60 && !isGenericPlace(meta.title, extract)) {
+          if (extract && extract.length >= 180 && !isGenericPlace(meta.title, extract)) {
             cache[id] = {
               pageid: id,
               title: meta.title,
@@ -862,12 +966,18 @@
     isProcessing = true;
 
     try {
-      const radius = Number(document.getElementById('radius').value);
+      const selectedCategories = getSelectedSiteCategories();
+      if (selectedCategories.size === 0) {
+        log('Select at least one site category to find landmarks.');
+        return;
+      }
+
+      const radius = getSearchRadiusMeters(coords);
       const heard = getHeardSet();
       const routeCache = getRouteCache();
 
       let candidates = Object.values(routeCache)
-        .filter(item => !heard.has(item.pageid) && !isGenericPlace(item.title, item.extract))
+        .filter(item => !heard.has(item.pageid) && !isGenericPlace(item.title, item.extract) && matchesSelectedSiteCategories(item.title, item.extract))
         .map(item => ({
           ...item,
           dist: haversineMeters(coords.latitude, coords.longitude, item.lat, item.lon),
@@ -878,8 +988,7 @@
 
       if (candidates.length === 0) {
         if (!navigator.onLine) {
-          log('Offline and no cached landmarks within current radius.');
-          isProcessing = false;
+          log('Offline with no matching cached landmarks within the current range.');
           return;
         }
         const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=${radius}&gslimit=25&format=json&origin=*`;
@@ -895,27 +1004,31 @@
       }
 
       if (candidates.length === 0) {
-        log('No unheard historic landmarks nearby.');
-        isProcessing = false;
+        log('No unheard landmarks in the selected categories and range.');
         return;
       }
 
       if (coords.speed && coords.speed > 2.2 && coords.heading !== null && !isNaN(coords.heading)) {
+        const angleLimit = coords.speed >= 22.2 ? 50 : 75;
         const ahead = candidates.filter(c => {
           const bearing = calculateBearing(coords.latitude, coords.longitude, c.lat, c.lon);
-          return Math.abs(signedAngleDifference(coords.heading, bearing)) <= 75;
+          return Math.abs(signedAngleDifference(coords.heading, bearing)) <= angleLimit;
         });
         if (ahead.length > 0) {
           candidates = ahead;
-          log(`Filtered to ${ahead.length} landmarks ahead of driving direction.`);
+          log(`Filtered to ${ahead.length} landmarks ahead of travel direction.`);
+        } else if (coords.speed >= 22.2) {
+          log('No selected-category landmarks ahead in the current highway range.');
+          return;
         }
       }
 
-      // Rank by historical relevance + proximity
-      candidates.sort((a, b) => scoreLandmark(b) - scoreLandmark(a));
+      // Prefer documented, widely recognized sites while keeping nearby stops competitive.
+      candidates.sort((a, b) => scoreLandmark(b, radius) - scoreLandmark(a, radius) || a.dist - b.dist);
 
       let target = null;
       let extract = '';
+      let skippedByCategory = false;
 
       for (const candidate of candidates) {
         let candidateExtract = candidate.extract || '';
@@ -926,9 +1039,14 @@
           candidateExtract = extData?.query?.pages?.[candidate.pageid]?.extract || '';
         }
 
-        if (!candidateExtract || candidateExtract.length < 60 || isGenericPlace(candidate.title, candidateExtract)) {
-          log(`Skipping generic/non-historic entry: "${candidate.title}"`);
+        if (!candidateExtract || candidateExtract.length < 180 || isGenericPlace(candidate.title, candidateExtract)) {
+          log(`Skipping generic or thin entry: "${candidate.title}"`);
           markAsHeard(candidate.pageid);
+          continue;
+        }
+
+        if (!matchesSelectedSiteCategories(candidate.title, candidateExtract)) {
+          skippedByCategory = true;
           continue;
         }
 
@@ -938,16 +1056,24 @@
       }
 
       if (!target) {
-        log('No qualifying historic landmarks found in this scan.');
-        isProcessing = false;
+        log(skippedByCategory
+          ? 'Nearby entries did not match the selected site categories.'
+          : 'No qualifying, well-documented landmarks found in this scan.');
         return;
       }
 
       const distanceMeters = Math.round(target.dist);
-      const relativeDir = getRelativeDirection(coords, target.lat, target.lon);
+      const broadArea = coords.speed >= 22.2 && distanceMeters > 1500;
+      const hasHeading = coords.heading !== null && Number.isFinite(coords.heading);
+      const relativeDir = broadArea
+        ? (hasHeading ? 'in the broader area ahead' : 'in the broader area around you')
+        : getRelativeDirection(coords, target.lat, target.lon);
       log(`Selected: "${target.title}" (${distanceMeters}m, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
 
-      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract);
+      const storyPacing = candidates.length >= 4
+        ? 'Several potential sites are within range, so keep this story compact and leave room for the next one.'
+        : 'Few other sites appear to be nearby; a little more context is welcome only if the source has genuinely worthwhile facts.';
+      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract, storyPacing);
 
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
       const sourceTag = target.fromCache ? 'Offline Route Cache' : 'Live Wikipedia';
@@ -984,9 +1110,13 @@
     return (picked.length > 0 ? picked : sentences.slice(0, 2)).join('. ') + '.';
   }
 
-  async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract) {
+  async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract, storyPacing = '') {
     const key = apiKeyInput.value.trim();
     const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
+    const selectedCategoryLabels = [...getSelectedSiteCategories()]
+      .map(category => SITE_CATEGORY_LABELS[category])
+      .filter(Boolean)
+      .join(', ');
 
     if (!key || !navigator.onLine) {
       const summary = cleanWikiSummary(wikiExtract);
@@ -994,6 +1124,9 @@
     }
 
     const distPhrase = distanceMeters !== null ? ` (${distanceMeters} meters away)` : '';
+    const travelContext = relativeDir === 'in the broader area ahead'
+      ? 'The listener is moving at highway speed and this site is farther away; tell a brief story about the broader area ahead and do not imply the site is visible or being passed right now.'
+      : 'The listener is near this site; orient them briefly without adding driving instructions.';
 
     try {
       log('Generating AI tour script via gpt-4o-mini...');
@@ -1005,21 +1138,22 @@
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          temperature: 0.7,
-          max_tokens: 180,
+          temperature: 0.4,
+          max_tokens: 240,
           messages: [
             {
               role: 'system',
               content: [
-                'You are a witty, engaging radio tour guide narrating for a driver passing a landmark.',
-                'Start by naturally orienting the driver using the provided relative direction (e.g., "Ahead on your left..."), then share a punchy 3-sentence spoken anecdote (max 65 words total) highlighting the most surprising historical fact.',
-                'CRITICAL: The listener is already driving right past it—NEVER mention the city, county, state, province, or country it is located in (e.g., skip "located in Pennsylvania, United States"). Jump straight into what makes it interesting.',
-                'Never say "As you can see in this photo" or use markdown/bullet points.'
+                'You are a concise, warm radio guide choosing the most interesting verified story about a nearby place.',
+                'Open with a short natural orientation using the supplied direction, then tell 2–5 clear spoken sentences. Usually use 35–80 words; a genuinely rich story may use up to 120 words (about one minute), but stop as soon as the worthwhile facts are told.',
+                'Choose one or two of the strongest facts, explain why they matter, and use only the supplied facts. Do not invent details, add generic transitions, repeat the title, or pad the story to fill time. If the source has little substance, keep the narration short.',
+                'When the selected categories are available, keep the story relevant to them. Keep nearby stories grounded in the site itself; for broader-area stories, do not imply the listener can see or is passing the site.',
+                'Avoid location boilerplate about the city, county, state, province, or country unless needed to distinguish the site. Never use markdown, bullets, or photo references.'
               ].join(' ')
             },
             {
               role: 'user',
-              content: `Landmark: ${title}\nLocation relative to driver: ${relativeDir}${distPhrase}\nFacts: ${wikiExtract.slice(0, 1500)}`
+              content: `Landmark: ${title}\nSelected site categories: ${selectedCategoryLabels || 'not specified'}\nLocation relative to driver: ${relativeDir}${distPhrase}\nTravel guidance: ${travelContext}\nStory pacing: ${storyPacing}\nFacts: ${wikiExtract.slice(0, 1500)}`
             }
           ]
         })
