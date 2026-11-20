@@ -1122,6 +1122,11 @@
     const selectedCategoryLabels = selectedCategories.join(', ');
 
     if (!serviceUrl || !accessCode || !navigator.onLine) {
+      const missingRequirements = [];
+      if (!serviceUrl) missingRequirements.push('backend URL is missing');
+      if (!accessCode) missingRequirements.push('tester access code is missing');
+      if (!navigator.onLine) missingRequirements.push('device is offline');
+      log(`OpenAI narration skipped (${missingRequirements.join(', ')}); using Wikipedia fallback.`);
       const summary = cleanWikiSummary(wikiExtract);
       return `${capDir} is ${title}. ${summary}`;
     }
@@ -1147,7 +1152,11 @@
 
       if (!response.ok) throw new Error(`Tour service error (${response.status})`);
       const data = await response.json();
-      return data.narration;
+      if (typeof data.narration !== 'string' || !data.narration.trim()) {
+        throw new Error('Tour service returned no narration.');
+      }
+      log('OpenAI narration received.');
+      return data.narration.trim();
     } catch (err) {
       log(`AI script fallback (${err.message})`);
       const summary = cleanWikiSummary(wikiExtract);
