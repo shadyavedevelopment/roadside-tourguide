@@ -1,8 +1,9 @@
-const CACHE_NAME = 'roadside-tourguide-v7';
+const CACHE_NAME = 'roadside-tourguide-v8';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './backend-config.js'
 ];
 
 self.addEventListener('install', (event) => {

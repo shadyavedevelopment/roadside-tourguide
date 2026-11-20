@@ -12,4 +12,4 @@ Serve this folder from `localhost` (service workers do not run from `file://` UR
 
 This is a static site. Publish the repository's root folder with GitHub Pages. The deployed site will be available at the Pages URL shown in the repository's **Settings → Pages**.
 
-The app shell can load offline after its first successful visit. Live Wikipedia lookups, geocoding, and OpenAI features require their respective network access. The optional OpenAI key is stored in the browser and should not be committed to the repository.
+The app shell can load offline after its first successful visit. Live Wikipedia lookups, geocoding, and hosted narration require network access. The OpenAI API key belongs in the Lambda environment, never in the browser or this repository. See [`backend/README.md`](backend/README.md) for the pilot backend setup.

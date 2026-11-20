@@ -167,8 +167,9 @@
   <!-- Configuration Card -->
   <div class="card">
     <div>
-      <label for="apiKey">OpenAI API Key (optional — stored locally in browser)</label>
-      <input type="password" id="apiKey" placeholder="sk-... (leave blank for Free Offline TTS)" />
+      <label for="accessCode">Tester access code</label>
+      <input type="password" id="accessCode" placeholder="Enter the code shared by the app owner" autocomplete="current-password" />
+      <p class="setting-hint">The shared test code connects to Roadside Tourguide’s hosted narration service. Your OpenAI API key stays on the server.</p>
     </div>
     <div class="row">
       <div>
@@ -275,6 +276,7 @@
     <div id="logBox" class="log">Initialized. Waiting for start...</div>
   </div>
 
+<script src="./backend-config.js"></script>
 <script>
   // --- PWA Service Worker & Install Prompt ---
   let deferredInstallPrompt = null;
@@ -318,7 +320,7 @@
   let wakeLock = null;
   let currentAudioBlobUrl = null;
 
-  const STORAGE_KEY_API = 'rh_openai_key';
+  const STORAGE_KEY_ACCESS = 'rh_tourguide_access_code';
   const STORAGE_KEY_HEARD = 'rh_heard_pageids';
   const STORAGE_KEY_CACHE = 'rh_route_cache';
   const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
@@ -334,15 +336,15 @@
     nature: /\b(national park|state park|park|waterfall|mountain|river|lake|forest|cave|island|garden|arboretum|geological|natural landmark|nature reserve|preserve|wildlife refuge)\b/i
   };
 
-  const apiKeyInput = document.getElementById('apiKey');
+  const accessCodeInput = document.getElementById('accessCode');
   const audioPlayer = document.getElementById('audioPlayer');
   const logBox = document.getElementById('logBox');
   const radiusInput = document.getElementById('radius');
   const siteCategoryInputs = [...document.querySelectorAll('[data-site-category]')];
 
-  apiKeyInput.value = localStorage.getItem(STORAGE_KEY_API) || '';
-  apiKeyInput.addEventListener('change', () => {
-    localStorage.setItem(STORAGE_KEY_API, apiKeyInput.value.trim());
+  accessCodeInput.value = localStorage.getItem(STORAGE_KEY_ACCESS) || '';
+  accessCodeInput.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEY_ACCESS, accessCodeInput.value.trim());
   });
 
   const savedRadius = localStorage.getItem(STORAGE_KEY_RADIUS);
@@ -814,8 +816,8 @@
     const badge = document.getElementById('statusBadge');
 
     if (!isRunning) {
-      if (!apiKeyInput.value.trim() && document.getElementById('voice').value !== 'browser') {
-        log('No OpenAI API key set — defaulting to Free Browser TTS.');
+      if ((!window.ROADSIDETOUR_API_URL || !accessCodeInput.value.trim()) && document.getElementById('voice').value !== 'browser') {
+        log('Hosted narration is not configured — using source summaries and Free Browser TTS.');
       }
       isRunning = true;
       btn.textContent = 'Stop Tour';
@@ -1111,57 +1113,41 @@
   }
 
   async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract, storyPacing = '') {
-    const key = apiKeyInput.value.trim();
+    const serviceUrl = window.ROADSIDETOUR_API_URL;
+    const accessCode = accessCodeInput.value.trim();
     const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
-    const selectedCategoryLabels = [...getSelectedSiteCategories()]
+    const selectedCategories = [...getSelectedSiteCategories()]
       .map(category => SITE_CATEGORY_LABELS[category])
-      .filter(Boolean)
-      .join(', ');
+      .filter(Boolean);
+    const selectedCategoryLabels = selectedCategories.join(', ');
 
-    if (!key || !navigator.onLine) {
+    if (!serviceUrl || !accessCode || !navigator.onLine) {
       const summary = cleanWikiSummary(wikiExtract);
       return `${capDir} is ${title}. ${summary}`;
     }
 
-    const distPhrase = distanceMeters !== null ? ` (${distanceMeters} meters away)` : '';
-    const travelContext = relativeDir === 'in the broader area ahead'
-      ? 'The listener is moving at highway speed and this site is farther away; tell a brief story about the broader area ahead and do not imply the site is visible or being passed right now.'
-      : 'The listener is near this site; orient them briefly without adding driving instructions.';
-
     try {
-      log('Generating AI tour script via gpt-4o-mini...');
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      log('Generating AI tour narration...');
+      const response = await fetch(serviceUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`
+          'X-Tourguide-Access-Code': accessCode
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          temperature: 0.4,
-          max_tokens: 240,
-          messages: [
-            {
-              role: 'system',
-              content: [
-                'You are a concise, warm radio guide choosing the most interesting verified story about a nearby place.',
-                'Open with a short natural orientation using the supplied direction, then tell 2–5 clear spoken sentences. Usually use 35–80 words; a genuinely rich story may use up to 120 words (about one minute), but stop as soon as the worthwhile facts are told.',
-                'Choose one or two of the strongest facts, explain why they matter, and use only the supplied facts. Do not invent details, add generic transitions, repeat the title, or pad the story to fill time. If the source has little substance, keep the narration short.',
-                'When the selected categories are available, keep the story relevant to them. Keep nearby stories grounded in the site itself; for broader-area stories, do not imply the listener can see or is passing the site.',
-                'Avoid location boilerplate about the city, county, state, province, or country unless needed to distinguish the site. Never use markdown, bullets, or photo references.'
-              ].join(' ')
-            },
-            {
-              role: 'user',
-              content: `Landmark: ${title}\nSelected site categories: ${selectedCategoryLabels || 'not specified'}\nLocation relative to driver: ${relativeDir}${distPhrase}\nTravel guidance: ${travelContext}\nStory pacing: ${storyPacing}\nFacts: ${wikiExtract.slice(0, 1500)}`
-            }
-          ]
+          action: 'narration',
+          title,
+          distanceMeters,
+          relativeDir,
+          selectedCategories,
+          storyPacing,
+          wikiExtract: wikiExtract.slice(0, 1500)
         })
       });
 
-      if (!response.ok) throw new Error(`OpenAI Chat API error (${response.status})`);
+      if (!response.ok) throw new Error(`Tour service error (${response.status})`);
       const data = await response.json();
-      return data.choices[0].message.content.trim();
+      return data.narration;
     } catch (err) {
       log(`AI script fallback (${err.message})`);
       const summary = cleanWikiSummary(wikiExtract);
@@ -1178,9 +1164,10 @@
 
   async function speakText(text) {
     const voice = document.getElementById('voice').value;
-    const key = apiKeyInput.value.trim();
+    const serviceUrl = window.ROADSIDETOUR_API_URL;
+    const accessCode = accessCodeInput.value.trim();
 
-    if (voice === 'browser' || !key || !navigator.onLine) {
+    if (voice === 'browser' || !serviceUrl || !accessCode || !navigator.onLine) {
       log('Speaking via built-in offline browser TTS...');
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -1190,21 +1177,21 @@
     }
 
     try {
-      log(`Generating OpenAI TTS audio (${voice})...`);
-      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+      log(`Generating narration audio (${voice})...`);
+      const response = await fetch(serviceUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`
+          'X-Tourguide-Access-Code': accessCode
         },
         body: JSON.stringify({
-          model: 'tts-1',
-          voice: voice,
-          input: text
+          action: 'speech',
+          voice,
+          text
         })
       });
 
-      if (!response.ok) throw new Error(`OpenAI TTS API error (${response.status})`);
+      if (!response.ok) throw new Error(`Tour service error (${response.status})`);
       const blob = await response.blob();
 
       cleanupAudioBlob();
