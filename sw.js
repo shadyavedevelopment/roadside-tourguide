@@ -1,9 +1,12 @@
-const CACHE_NAME = 'roadside-tourguide-v9';
+const CACHE_NAME = 'roadside-tourguide-v10';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
   './icon.svg',
-  './backend-config.js'
+  './backend-config.js',
+  './data/pittsburgh-pois.json',
+  './data/chicago-pois.json',
+  './data/san-diego-pois.json'
 ];
 
 self.addEventListener('install', (event) => {
