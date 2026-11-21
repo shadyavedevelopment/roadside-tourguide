@@ -633,6 +633,12 @@
     ]
   };
   const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
+  async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try { return await fetch(url, {...options, signal: controller.signal}); }
+    finally { clearTimeout(timer); }
+  }
   async function generateCuratedTour() {
     if (narrationMode() !== 'premium') {
       curatedStatus('Switch to Premium testing mode to build a curated tour.');
@@ -645,13 +651,14 @@
     try {
       curatedStatus('Locating town and discovering landmarks...');
       const area = document.getElementById('curatedArea').value.trim();
-      const center = area ? await geocodePlace(area) : await getCurrentGpsPromise();
+      const center = area ? await Promise.race([geocodePlace(area), new Promise((_, reject) => setTimeout(() => reject(new Error('Town lookup timed out. Try a more specific place name.')), 10000))]) : await Promise.race([getCurrentGpsPromise(), new Promise((_, reject) => setTimeout(() => reject(new Error('GPS location timed out. Enter a town name instead.')), 12000))]);
       curatedAreaName = center.name;
       const radius = Number(document.getElementById('curatedRadius').value);
       const count = Number(document.getElementById('curatedStops').value);
       const style = document.getElementById('curatedStyle').value;
       const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${radius}&gslimit=50&format=json&origin=*`;
-      const geoRes = await fetch(url);
+      curatedStatus('Searching nearby attractions (step 1 of 4)...');
+      const geoRes = await fetchTourResource(url, {}, 9000);
       if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
       let geo = (await geoRes.json()).query?.geosearch || [];
       // Supplement distance-only results with historically significant destinations.
@@ -659,16 +666,17 @@
       const cityKey = (area || curatedAreaName).toLowerCase().split(',')[0].trim();
       const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
+      curatedStatus('Finding popular visitor destinations (step 2 of 4)...');
       for (const term of searches) {
         try {
-          const response = await fetch('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(term) + '&srlimit=12&format=json&origin=*');
+          const response = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(term) + '&srlimit=12&format=json&origin=*', {}, 4500);
           if (response.ok) ((await response.json()).query?.search || []).forEach(p => discoveredTitles.add(p.title));
         } catch (error) { log('Additional discovery unavailable: ' + error.message); }
       }
       localHints.forEach(title => discoveredTitles.add(title));
       if (discoveredTitles.size) {
         try {
-          const lookup = await fetch('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...discoveredTitles].slice(0, 36).join('|')) + '&format=json&origin=*');
+          const lookup = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...discoveredTitles].slice(0, 36).join('|')) + '&format=json&origin=*', {}, 8000);
           if (lookup.ok) {
             const pages = Object.values((await lookup.json()).query?.pages || {});
             const known = new Set(geo.map(p => p.pageid));
@@ -685,10 +693,11 @@
       }
       // OSM points supplement encyclopedic records with attractions like viewpoints,
       // market districts and tourism destinations that have little Wikipedia coverage.
+      curatedStatus('Checking parks, viewpoints and local attractions (step 3 of 4)...');
       const osmCandidates = [];
       try {
         const query = '[out:json][timeout:12];(nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
-        const osmRes = await fetch('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})});
+        const osmRes = await fetchTourResource('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})}, 7000);
         if (osmRes.ok) {
           const elements = (await osmRes.json()).elements || [];
           for (const item of elements) {
@@ -704,10 +713,11 @@
         }
       } catch (error) { log('OpenStreetMap attraction discovery unavailable: ' + error.message); }
       if (!geo.length && !osmCandidates.length) throw new Error('No attractions found in this area.');
+      curatedStatus('Ranking destinations (step 4 of 4)...');
       const ids = geo.map(p => p.pageid).filter(id => typeof id === 'number').slice(0, 90).join('|');
       let pages = {};
       if (ids) {
-        const detailsRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`);
+        const detailsRes = await fetchTourResource(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`, {}, 8000);
         if (detailsRes.ok) pages = (await detailsRes.json()).query?.pages || {};
       }
       const combined = [...geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || ''})), ...osmCandidates];
@@ -733,7 +743,7 @@
       curatedStatus('Optimizing driving stop order...');
       try {
         const coords = curatedStops.map(p => `${p.lon},${p.lat}`).join(';');
-        const routeRes = await fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last&overview=false`);
+        const routeRes = await fetchTourResource(`https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last&overview=false`, {}, 6500);
         if (routeRes.ok) {
           const result = await routeRes.json();
           if (result.code === 'Ok' && result.waypoints?.length === curatedStops.length && result.waypoints.every(p => Number.isInteger(p.waypoint_index))) {
