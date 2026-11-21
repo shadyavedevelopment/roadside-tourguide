@@ -714,6 +714,10 @@
   const MIN_HIGHLIGHT_SCORE = 105;
   const HIGHLIGHT_BUILDING_PATTERN = /\b(building|tower|office|headquarters|skyscraper|commercial block|bank building|historic district|residence|house|apartments|condominiums|hotel)\b/i;
   const HIGHLIGHT_EXPERIENCE_PATTERN = /\b(incline|funicular|overlook|viewpoint|panorama|scenic|park|market|stadium|ballpark|museum|science center|zoo|aquarium|garden|riverfront|bridge|landmark)\b/i;
+  // Ordinary educational facilities are not visitor attractions. Keep established
+  // campus landmarks, museums, gardens, and historic visitor experiences.
+  const EDUCATIONAL_FACILITY_PATTERN = /\b(university|college|community college|technical college|school|academy|institute of technology|campus|student center|student union|lecture hall|academic building|education center|learning center|research center|faculty building|department of|school of)\b/i;
+  const EDUCATIONAL_VISITOR_EXCEPTION = /\b(cathedral of learning|nationality rooms|heinz memorial chapel|robie house|museum|gallery|botanical garden|conservatory|planetarium|observatory|historic house|historic landmark|architecture tour)\b/i;
   const LOW_VALUE_ATTRACTION_PATTERN = /\b(parking|garage|restroom|toilet|playground|picnic area|bus stop|transit stop|office|apartment|condominium|warehouse|gas station|car wash|storage|loading dock|utility|maintenance|gift shop|souvenir|visitor center|information kiosk)\b/i;
   const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
   async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
@@ -837,6 +841,9 @@
         if (isGenericPlace(p.title, p.extract) && !p.osm && !p.curated) continue;
         if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
+        // Apply across all tour styles: a school's historical mention alone
+        // should not turn an ordinary campus facility into a sightseeing stop.
+        if (!p.curated && EDUCATIONAL_FACILITY_PATTERN.test(p.title) && !EDUCATIONAL_VISITOR_EXCEPTION.test(p.title)) continue;
         if (style === 'highlights' && (LOW_VALUE_ATTRACTION_PATTERN.test(p.title) || /\b(firstside|fourth avenue) historic district\b/i.test(p.title))) continue;
         if (style === 'highlights' && HIGHLIGHT_BUILDING_PATTERN.test(p.title) && !HIGHLIGHT_EXPERIENCE_PATTERN.test(p.title)) continue;
         const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
