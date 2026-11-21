@@ -19,7 +19,10 @@
       "description": "Balboa Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-2",
@@ -30,7 +33,10 @@
       "description": "San Diego Zoo — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-3",
@@ -41,7 +47,10 @@
       "description": "USS Midway Museum — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-4",
@@ -52,7 +61,10 @@
       "description": "La Jolla Cove — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-5",
@@ -63,7 +75,10 @@
       "description": "Cabrillo National Monument — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-6",
@@ -74,7 +89,10 @@
       "description": "Old Town San Diego State Historic Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-7",
@@ -85,7 +103,10 @@
       "description": "Coronado Beach — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-8",
@@ -96,7 +117,10 @@
       "description": "Hotel del Coronado — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-9",
@@ -107,7 +131,10 @@
       "description": "Torrey Pines State Natural Reserve — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-10",
@@ -118,7 +145,10 @@
       "description": "Sunset Cliffs Natural Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-11",
@@ -129,7 +159,10 @@
       "description": "Seaport Village — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-12",
@@ -140,7 +173,10 @@
       "description": "Maritime Museum of San Diego — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-13",
@@ -151,7 +187,10 @@
       "description": "Birch Aquarium — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-14",
@@ -162,7 +201,10 @@
       "description": "San Diego Museum of Art — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-15",
@@ -173,7 +215,10 @@
       "description": "Fleet Science Center — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-16",
@@ -184,7 +229,10 @@
       "description": "Japanese Friendship Garden — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-17",
@@ -195,7 +243,10 @@
       "description": "San Diego Air & Space Museum — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-18",
@@ -206,7 +257,10 @@
       "description": "San Diego Natural History Museum — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-19",
@@ -217,7 +271,10 @@
       "description": "Gaslamp Quarter — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-20",
@@ -228,7 +285,10 @@
       "description": "Petco Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-21",
@@ -239,7 +299,10 @@
       "description": "Little Italy — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-22",
@@ -250,7 +313,10 @@
       "description": "Mission Beach — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-23",
@@ -261,7 +327,10 @@
       "description": "Belmont Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-24",
@@ -272,7 +341,10 @@
       "description": "Mission Bay Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-25",
@@ -283,7 +355,10 @@
       "description": "Pacific Beach — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-26",
@@ -294,7 +369,10 @@
       "description": "Liberty Station — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-27",
@@ -305,7 +383,10 @@
       "description": "Mount Soledad National Veterans Memorial — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-28",
@@ -316,7 +397,10 @@
       "description": "Scripps Coastal Reserve — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "san-diego-29",
@@ -327,7 +411,10 @@
       "description": "San Diego Botanic Garden — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-30",
@@ -338,7 +425,10 @@
       "description": "San Diego Zoo Safari Park — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "san-diego-31",
@@ -349,7 +439,10 @@
       "description": "Coronado Ferry Landing — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "san-diego-32",
@@ -360,7 +453,10 @@
       "description": "Torrey Pines Gliderport — a notable visitor destination in the San Diego area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     }
   ]
 }
