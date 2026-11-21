@@ -572,10 +572,20 @@
       const intro = document.createElement('p');
       intro.textContent = 'Choose your stops from the discovered destinations. Recommendations are preselected; you can add or remove any candidate.';
       chooser.appendChild(intro);
+      const filterLabel = document.createElement('label');
+      filterLabel.textContent = 'Show attraction types: ';
+      const typeFilter = document.createElement('select');
+      for (const [value, title] of [['all','All attractions'],['drive-by','Drive-by sights'],['explore','Places to explore']]) {
+        const option = document.createElement('option');
+        option.value = value; option.textContent = title; typeFilter.appendChild(option);
+      }
+      filterLabel.appendChild(typeFilter);
+      chooser.appendChild(filterLabel);
       const count = document.createElement('p');
       count.className = 'setting-hint';
       const updateCount = () => { count.textContent = curatedSelected.size + ' selected of ' + curatedCandidates.length + ' candidates'; };
       chooser.appendChild(count);
+      const candidateRows = [];
       for (const candidate of curatedCandidates) {
         const label = document.createElement('label');
         label.className = 'site-category-option';
@@ -590,14 +600,18 @@
         });
         label.appendChild(input);
         const name = document.createElement('strong');
-        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '') + (candidate.curated ? ' · City catalog' : '');
+        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '') + (candidate.curated ? ' · City catalog' : '') + (candidate.visitType === 'drive-by' ? ' · 🚗 Drive-by' : candidate.visitType === 'explore' ? ' · 🚶 Explore' : '');
         label.appendChild(name);
         const detail = document.createElement('div');
         detail.className = 'setting-hint';
-        detail.textContent = (candidate.extract || '').slice(0, 155);
+        detail.textContent = (candidate.extract || '').slice(0, 155) + (candidate.suggestedVisitMinutes ? ' · Suggested visit: ~' + candidate.suggestedVisitMinutes + ' min' : '');
         label.appendChild(detail);
         chooser.appendChild(label);
+        candidateRows.push({label, candidate});
       }
+      typeFilter.addEventListener('change', () => {
+        for (const row of candidateRows) row.label.style.display = typeFilter.value === 'all' || row.candidate.visitType === typeFilter.value ? 'block' : 'none';
+      });
       updateCount();
       const build = document.createElement('button');
       build.textContent = 'Build Route from Selected Stops';
@@ -617,7 +631,7 @@
       li.appendChild(title);
       const description = document.createElement('p');
       description.className = 'setting-hint';
-      description.textContent = (stop.extract || '').slice(0, 240);
+      description.textContent = (stop.visitType === 'drive-by' ? '🚗 Drive-by sight' : stop.visitType === 'explore' ? '🚶 Place to explore' : 'Unclassified attraction') + (stop.suggestedVisitMinutes ? ' · ~' + stop.suggestedVisitMinutes + ' min' : '') + ' — ' + (stop.extract || '').slice(0, 240);
       li.appendChild(description);
       const preview = document.createElement('button');
       preview.className = 'secondary';
@@ -744,7 +758,7 @@
               pageid:p.id,title:p.name,lat:p.lat,lon:p.lon,
               dist:haversineMeters(center.lat,center.lon,p.lat,p.lon),
               extract:p.description,category:p.category,curated:true,
-              visitorAppeal:p.visitorAppeal
+              visitorAppeal:p.visitorAppeal,visitType:p.visitType,suggestedVisitMinutes:p.suggestedVisitMinutes
             }));
           }
         } catch (error) { log('Curated city catalog unavailable: ' + error.message); }
