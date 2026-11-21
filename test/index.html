@@ -233,6 +233,12 @@
       <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option><option value="24140">15 miles (metro)</option><option value="48280">30 miles (metro)</option></select></div>
       <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
     </div>
+    <label for="curatedExperience">Tour experience</label>
+    <select id="curatedExperience">
+      <option value="driving" selected>Scenic Driving Tour — more sights, shorter stops</option>
+      <option value="explore">Explore the City Tour — fewer sights, longer visits</option>
+    </select>
+    <p class="setting-hint">This choice changes suggested stops and route planning. You can still select any destination manually.</p>
     <label for="curatedStyle">Tour style</label>
     <select id="curatedStyle">
       <option value="highlights" selected>City highlights — iconic visitor experiences</option>
@@ -621,7 +627,9 @@
     }
     if (!curatedStops.length) return;
     const heading = document.createElement('p');
-    heading.textContent = `${curatedStops.length} selected stops around ${curatedAreaName}. Order is geographically optimized for a driving tour when routing is available.`;
+    const experience = document.getElementById('curatedExperience').value;
+    const minutes = curatedStops.reduce((total,stop) => total + (stop.suggestedVisitMinutes || (experience === 'driving' ? 10 : 60)), 0);
+    heading.textContent = `${curatedStops.length} selected stops around ${curatedAreaName}. Approximately ${Math.floor(minutes / 60)}h ${minutes % 60}m at attractions, excluding travel. Driving route order is geographically optimized when available.`;
     root.appendChild(heading);
     const list = document.createElement('ol');
     curatedStops.forEach(stop => {
@@ -648,7 +656,7 @@
       list.appendChild(li);
     });
     root.appendChild(list);
-    for (const mode of ['driving', 'walking']) {
+    for (const mode of (experience === 'driving' ? ['driving', 'walking'] : ['walking', 'driving'])) {
       const link = document.createElement('a');
       link.href = mapsDirectionsUrl(curatedStops, mode);
       link.target = '_blank';
@@ -660,14 +668,14 @@
     }
     const note = document.createElement('p');
     note.className = 'setting-hint';
-    note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Walking route order may differ from driving order.';
+    note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Driving optimization is used for the stop order, so walking route order may differ. Suggested visit durations are estimates, not travel times.';
     root.appendChild(note);
   }
   async function buildSelectedCuratedRoute() {
     curatedStops = curatedCandidates.filter(p => curatedSelected.has(String(p.pageid)));
     if (curatedStops.length < 2) { curatedStatus('Select at least two destinations to build a route.'); renderCuratedTour(); return; }
     if (curatedStops.length > 20) { curatedStatus('Please select no more than 20 stops for Google Maps routing.'); return; }
-    curatedStatus('Optimizing route for your selected stops...');
+    curatedStatus('Optimizing driving route for your selected stops...');
     try {
       const coords = curatedStops.map(p => p.lon + ',' + p.lat).join(';');
       const res = await fetchTourResource('https://router.project-osrm.org/trip/v1/driving/' + coords + '?roundtrip=false&source=first&destination=last&overview=false', {}, 6500);
@@ -733,6 +741,7 @@
       const radius = Number(document.getElementById('curatedRadius').value);
       const count = Number(document.getElementById('curatedStops').value);
       const style = document.getElementById('curatedStyle').value;
+      const experience = document.getElementById('curatedExperience').value;
       const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${Math.min(radius,10000)}&gslimit=50&format=json&origin=*`;
       curatedStatus('Searching nearby attractions (step 1 of 4)...');
       const geoRes = await fetchTourResource(url, {}, 9000);
@@ -844,7 +853,7 @@
         const credible = p.curated || p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
         const unverified = style === 'highlights' && !credible ? -75 : 0;
         const scenicBoost = style === 'highlights' && /mount washington|grandview|scenic overlook|observation deck/i.test(p.title) ? 125 : 0;
-        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.curated ? 240 + 20 * (p.visitorAppeal || 0) : 0) + (p.discovered ? 25 : 0)};
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.curated ? 240 + 20 * (p.visitorAppeal || 0) : 0) + (p.discovered ? 25 : 0) + (experience === 'driving' ? (p.visitType === 'drive-by' ? 240 : p.visitType === 'explore' ? -75 : 0) : (p.visitType === 'explore' ? 170 : p.visitType === 'drive-by' ? -160 : 0))};
       }).sort((a,b) => b.score - a.score);
       // Highlights should be a varied introduction to a city, not a list of
       // similarly named museums or monuments.
@@ -874,7 +883,7 @@
       curatedCandidates = candidates.slice(0, Math.max(35, count * 5)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
       curatedSelected = new Set(suggested.map(p=>String(p.pageid)));
       renderCuratedTour();
-      curatedStatus('Found ' + curatedCandidates.length + ' destinations (' + cachedAttractions.length + ' from the editorial city catalog). Pilot coordinates and access details are not yet verified. Choose stops, then build your route.');
+      curatedStatus((experience === 'driving' ? 'Scenic driving' : 'Explore the city') + ' tour: found ' + curatedCandidates.length + ' destinations (' + cachedAttractions.length + ' from the editorial city catalog). Pilot coordinates and access details are not yet verified. Choose stops, then build your route.');
     } catch (error) {
       curatedStatus('Could not build tour: ' + error.message);
     } finally { button.disabled = false; }
