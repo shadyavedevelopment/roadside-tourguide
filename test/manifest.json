@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "Roadside Tourguide",
+  "short_name": "Tourguide",
+  "description": "A personal audio tour that shares nearby historic landmarks while you travel.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
