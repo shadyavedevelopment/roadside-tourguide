@@ -615,15 +615,41 @@
       const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${radius}&gslimit=50&format=json&origin=*`;
       const geoRes = await fetch(url);
       if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
-      const geo = (await geoRes.json()).query?.geosearch || [];
+      let geo = (await geoRes.json()).query?.geosearch || [];
+      // Supplement distance-only results with historically significant destinations.
+      const searches = [curatedAreaName + ' historic landmarks', curatedAreaName + ' museums attractions', curatedAreaName + ' famous historical sites'];
+      const discoveredTitles = new Set();
+      for (const term of searches) {
+        try {
+          const response = await fetch('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(term) + '&srlimit=12&format=json&origin=*');
+          if (response.ok) ((await response.json()).query?.search || []).forEach(p => discoveredTitles.add(p.title));
+        } catch (error) { log('Additional discovery unavailable: ' + error.message); }
+      }
+      if (discoveredTitles.size) {
+        try {
+          const lookup = await fetch('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...discoveredTitles].slice(0, 36).join('|')) + '&format=json&origin=*');
+          if (lookup.ok) {
+            const pages = Object.values((await lookup.json()).query?.pages || {});
+            const known = new Set(geo.map(p => p.pageid));
+            for (const page of pages) {
+              const point = page.coordinates?.[0];
+              if (!point || known.has(page.pageid)) continue;
+              const dist = haversineMeters(center.lat, center.lon, point.lat, point.lon);
+              if (dist > radius) continue;
+              geo.push({pageid: page.pageid, title: page.title, lat: point.lat, lon: point.lon, dist, extract: page.extract || '', discovered: true});
+              known.add(page.pageid);
+            }
+          }
+        } catch (error) { log('Discovery enrichment unavailable: ' + error.message); }
+      }
       if (!geo.length) throw new Error('No Wikipedia landmarks found in this area.');
-      const ids = geo.map(p => p.pageid).join('|');
+      const ids = geo.map(p => p.pageid).slice(0, 90).join('|');
       const detailsRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`);
       if (!detailsRes.ok) throw new Error('Wikipedia landmark details unavailable.');
       const pages = (await detailsRes.json()).query?.pages || {};
-      const candidates = geo.map(p => ({...p, extract: pages[p.pageid]?.extract || '', lon: p.lon, lat: p.lat}))
+      const candidates = geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || '', lon: p.lon, lat: p.lat}))
         .filter(p => p.extract.length >= 90 && !isGenericPlace(p.title, p.extract) && matchesSelectedSiteCategories(p.title, p.extract))
-        .map(p => ({...p, score: scoreLandmark(p, radius)}))
+        .map(p => ({...p, score: scoreLandmark(p, radius) + (p.discovered ? 35 : 0)}))
         .sort((a,b) => b.score - a.score).slice(0, count);
       if (candidates.length < 2) throw new Error('Too few well-documented landmarks matched your categories. Try a larger radius or more categories.');
       curatedStops = candidates;
@@ -1254,7 +1280,7 @@
       const storyPacing = candidates.length >= 4
         ? 'Several potential sites are within range, so keep this story compact and leave room for the next one.'
         : 'Few other sites appear to be nearby; a little more context is welcome only if the source has genuinely worthwhile facts.';
-      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract, storyPacing);
+      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract, storyPacing + ' Emphasize documented events, notable people, and source-supported folklore. Never invent visits, legends, or anecdotes.');
 
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
       const sourceTag = target.fromCache ? 'Offline Route Cache' : 'Live Wikipedia';
