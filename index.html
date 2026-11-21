@@ -171,24 +171,32 @@
       <input type="password" id="accessCode" placeholder="Enter the code shared by the app owner" autocomplete="current-password" />
       <p class="setting-hint">The shared test code connects to Roadside Tourguide’s hosted narration service. Your OpenAI API key stays on the server.</p>
     </div>
+    <fieldset class="site-category-settings">
+      <legend>Testing narration mode</legend>
+      <label class="site-category-option"><input type="radio" name="narrationMode" value="free" checked /> Free — AI stories + device voice (no hosted speech charge)</label>
+      <label class="site-category-option"><input type="radio" name="narrationMode" value="premium" /> Premium — AI stories + hosted natural voice</label>
+      <p class="setting-hint">Both modes use AI storytelling and require the tester access code and internet. Premium uses paid hosted speech. Your choice is saved on this device.</p>
+    </fieldset>
     <div class="row">
       <div>
         <label for="radius">Search Range</label>
         <select id="radius">
-          <option value="auto" selected>Automatic by speed (500 m walk · 1 km city · 8 km highway)</option>
-          <option value="500">500 m (Close range)</option>
-          <option value="1000">1,000 m (City)</option>
-          <option value="3000">3,000 m</option>
-          <option value="8000">8,000 m (Highway)</option>
+          <option value="auto" selected>Automatic (110 yd walking · 220 yd city · 0.75 mi highway)</option>
+          <option value="60">65 yards (Very close)</option>
+          <option value="100">110 yards (Walking)</option>
+          <option value="200">220 yards (City)</option>
+          <option value="400">440 yards</option>
+          <option value="805">0.5 mile</option>
+          <option value="1207">0.75 mile</option>
+          <option value="1609">1 mile</option>
         </select>
       </div>
       <div>
-        <label for="voice">Narrator Voice</label>
+        <label for="voice">Premium narrator voice</label>
         <select id="voice">
           <option value="onyx">Onyx (Deep Storyteller)</option>
           <option value="nova" selected>Nova (Warm Guide)</option>
           <option value="fable">Fable (Expressive)</option>
-          <option value="browser">Free Browser TTS ($0 / Offline)</option>
         </select>
       </div>
     </div>
@@ -205,10 +213,42 @@
       </div>
       <p class="setting-hint">Choose one or more. The app favors well-known, historically significant sites nearby and skips ordinary places.</p>
     </fieldset>
+    <label class="site-category-option"><input id="roadAware" type="checkbox" checked /> Prioritize landmarks on or immediately beside my current road (experimental)</label>
+    <p class="setting-hint">Uses road snapping and travel direction when online. May miss sites on adjacent streets or where mapping data is incomplete.</p>
+    <label class="site-category-option"><input id="areaStories" type="checkbox" /> Include broader local-history stories when no roadside landmark qualifies</label>
+    <p class="setting-hint">Off by default. Broader stories are labeled as area history, not visible roadside sites.</p>
     <div class="row">
       <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
       <button id="scanNowBtn" class="secondary" onclick="manualScan()">Scan Now</button>
     </div>
+  </div>
+
+  <!-- Curated local tour (premium pilot) -->
+  <div class="card" id="curatedTourCard">
+    <div class="card-header"><span>Curated Town Tour</span><span class="pill-offline">Premium pilot</span></div>
+    <p class="setting-hint">Discover significant local sites, review the proposed stops, then open turn-by-turn directions in Maps. This beta uses Wikipedia landmark information and routing services; confirm access and opening hours independently.</p>
+    <label for="curatedArea">Town or area (blank = current GPS)</label>
+    <input id="curatedArea" type="text" placeholder="e.g., Gettysburg, Pennsylvania" />
+    <div class="row">
+      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option><option value="24140">15 miles (metro)</option><option value="48280">30 miles (metro)</option></select></div>
+      <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
+    </div>
+    <label for="curatedExperience">Tour experience</label>
+    <select id="curatedExperience">
+      <option value="driving" selected>Scenic Driving Tour — more sights, shorter stops</option>
+      <option value="explore">Explore the City Tour — fewer sights, longer visits</option>
+    </select>
+    <p class="setting-hint">This choice changes suggested stops and route planning. You can still select any destination manually.</p>
+    <label for="curatedStyle">Tour style</label>
+    <select id="curatedStyle">
+      <option value="highlights" selected>City highlights — iconic visitor experiences</option>
+      <option value="history">History and culture</option>
+      <option value="scenic">Scenic views and outdoors</option>
+      <option value="family">Family attractions</option>
+    </select>
+    <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Discover Tour Stops</button>
+    <p id="curatedStatus" class="setting-hint" role="status">Select Premium mode to discover destinations.</p>
+    <div id="curatedResults"></div>
   </div>
 
   <!-- Offline Route Pre-Loader Card -->
@@ -321,11 +361,21 @@
   let currentAudioBlobUrl = null;
 
   const STORAGE_KEY_ACCESS = 'rh_tourguide_access_code';
+  const STORAGE_KEY_MODE = 'rh_narration_mode';
   const STORAGE_KEY_HEARD = 'rh_heard_pageids';
   const STORAGE_KEY_CACHE = 'rh_route_cache';
   const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
   const STORAGE_KEY_CATEGORIES = 'rh_site_categories';
   const STORAGE_KEY_RADIUS = 'rh_search_radius';
+  const STORAGE_KEY_AREA = 'rh_area_stories';
+  const STORAGE_KEY_ROAD_AWARE = 'rh_road_aware';
+  const roadAwareInput = document.getElementById('roadAware');
+  roadAwareInput.checked = localStorage.getItem(STORAGE_KEY_ROAD_AWARE) !== 'false';
+  roadAwareInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_ROAD_AWARE, String(roadAwareInput.checked)));
+  const areaStoriesInput = document.getElementById('areaStories');
+  areaStoriesInput.checked = localStorage.getItem(STORAGE_KEY_AREA) === 'true';
+  areaStoriesInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_AREA, String(areaStoriesInput.checked)));
+  function formatDistance(m) { return m < 402 ? Math.round(m * 1.0936133) + ' yards' : (m / 1609.344).toFixed(1) + ' miles'; }
 
   const SITE_CATEGORY_RULES = {
     historic: /\b(historic|historical|architecture|architectural|national register|historic district|historic house|mansion|estate|castle|cathedral|church|courthouse|lighthouse|cemetery|plantation|ruins|archaeological|colonial|landmark)\b/i,
@@ -337,6 +387,23 @@
   };
 
   const accessCodeInput = document.getElementById('accessCode');
+  const voiceInput = document.getElementById('voice');
+  const modeInputs = [...document.querySelectorAll('input[name="narrationMode"]')];
+  function narrationMode() { return modeInputs.find(input => input.checked)?.value || 'free'; }
+  function updateModeUi() {
+    voiceInput.disabled = narrationMode() !== 'premium';
+    const curatedButton = document.getElementById('curatedGenerateBtn');
+    if (curatedButton) curatedButton.disabled = narrationMode() !== 'premium';
+    voiceInput.title = voiceInput.disabled ? 'Choose Premium to enable hosted voices.' : '';
+  }
+  const savedMode = localStorage.getItem(STORAGE_KEY_MODE);
+  if (savedMode === 'premium') modeInputs.find(input => input.value === 'premium').checked = true;
+  modeInputs.forEach(input => input.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEY_MODE, narrationMode());
+    updateModeUi();
+    log(`Narration mode selected: ${narrationMode()}. Applies to the next story.`);
+  }));
+  updateModeUi();
   const audioPlayer = document.getElementById('audioPlayer');
   const logBox = document.getElementById('logBox');
   const radiusInput = document.getElementById('radius');
@@ -445,9 +512,9 @@
     if (choice !== 'auto') return Number(choice);
 
     const speed = Number.isFinite(coords?.speed) ? coords.speed : 0;
-    if (speed < 6.7) return 500;       // walking or slow local movement
-    if (speed < 22.2) return 1000;     // city streets and ordinary roads
-    return 8000;                       // expressway speeds: broader-area stories
+    if (speed < 2.2) return 100;       // walking or slow local movement
+    if (speed < 22.2) return 200;     // city streets and ordinary roads
+    return 1207; // highway
   }
 
   function isGenericPlace(title, extract = '') {
@@ -489,6 +556,356 @@
       ? Math.max(0, 30 * (1 - Math.min(item.dist / Math.max(radiusMeters, 1), 1)))
       : 0;
     return importance + proximity;
+  }
+
+  // --- Curated town tour (premium pilot) ---
+  let curatedStops = [];
+  let curatedCandidates = [];
+  let curatedSelected = new Set();
+  let curatedAreaName = '';
+  function curatedStatus(message) { document.getElementById('curatedStatus').textContent = message; }
+  function mapsDirectionsUrl(stops, travelMode = 'driving') {
+    const location = stop => `${stop.lat},${stop.lon}`;
+    const params = new URLSearchParams({ api: '1', origin: location(stops[0]), destination: location(stops[stops.length - 1]), travelmode: travelMode });
+    if (stops.length > 2) params.set('waypoints', stops.slice(1, -1).map(location).join('|'));
+    return 'https://www.google.com/maps/dir/?' + params.toString();
+  }
+  function renderCuratedTour() {
+    const root = document.getElementById('curatedResults');
+    root.replaceChildren();
+    if (curatedCandidates.length) {
+      const chooser = document.createElement('div');
+      const intro = document.createElement('p');
+      intro.textContent = 'Choose your stops from the discovered destinations. Recommendations are preselected; you can add or remove any candidate.';
+      chooser.appendChild(intro);
+      const filterLabel = document.createElement('label');
+      filterLabel.textContent = 'Show attraction types: ';
+      const typeFilter = document.createElement('select');
+      for (const [value, title] of [['all','All attractions'],['drive-by','Drive-by sights'],['explore','Places to explore']]) {
+        const option = document.createElement('option');
+        option.value = value; option.textContent = title; typeFilter.appendChild(option);
+      }
+      filterLabel.appendChild(typeFilter);
+      chooser.appendChild(filterLabel);
+      const count = document.createElement('p');
+      count.className = 'setting-hint';
+      const updateCount = () => { count.textContent = curatedSelected.size + ' selected of ' + curatedCandidates.length + ' candidates'; };
+      chooser.appendChild(count);
+      const candidateRows = [];
+      for (const candidate of curatedCandidates) {
+        const label = document.createElement('label');
+        label.className = 'site-category-option';
+        label.style.display = 'block';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = curatedSelected.has(String(candidate.pageid));
+        input.addEventListener('change', () => {
+          if (input.checked) curatedSelected.add(String(candidate.pageid));
+          else curatedSelected.delete(String(candidate.pageid));
+          updateCount();
+        });
+        label.appendChild(input);
+        const name = document.createElement('strong');
+        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '') + (candidate.curated ? ' · City catalog' : '') + (candidate.visitType === 'drive-by' ? ' · 🚗 Drive-by' : candidate.visitType === 'explore' ? ' · 🚶 Explore' : '');
+        label.appendChild(name);
+        const detail = document.createElement('div');
+        detail.className = 'setting-hint';
+        detail.textContent = (candidate.extract || '').slice(0, 155) + (candidate.suggestedVisitMinutes ? ' · Suggested visit: ~' + candidate.suggestedVisitMinutes + ' min' : '');
+        label.appendChild(detail);
+        chooser.appendChild(label);
+        candidateRows.push({label, candidate});
+      }
+      typeFilter.addEventListener('change', () => {
+        for (const row of candidateRows) row.label.style.display = typeFilter.value === 'all' || row.candidate.visitType === typeFilter.value ? 'block' : 'none';
+      });
+      updateCount();
+      const build = document.createElement('button');
+      build.textContent = 'Build Route from Selected Stops';
+      build.addEventListener('click', buildSelectedCuratedRoute);
+      chooser.appendChild(build);
+      root.appendChild(chooser);
+    }
+    if (!curatedStops.length) return;
+    const heading = document.createElement('p');
+    const experience = document.getElementById('curatedExperience').value;
+    const minutes = curatedStops.reduce((total,stop) => total + (stop.suggestedVisitMinutes || (experience === 'driving' ? 10 : 60)), 0);
+    heading.textContent = `${curatedStops.length} selected stops around ${curatedAreaName}. Approximately ${Math.floor(minutes / 60)}h ${minutes % 60}m at attractions, excluding travel. Driving route order is geographically optimized when available.`;
+    root.appendChild(heading);
+    const list = document.createElement('ol');
+    curatedStops.forEach(stop => {
+      const li = document.createElement('li');
+      const title = document.createElement('strong');
+      title.textContent = stop.title;
+      li.appendChild(title);
+      const description = document.createElement('p');
+      description.className = 'setting-hint';
+      description.textContent = (stop.visitType === 'drive-by' ? '🚗 Drive-by sight' : stop.visitType === 'explore' ? '🚶 Place to explore' : 'Unclassified attraction') + (stop.suggestedVisitMinutes ? ' · ~' + stop.suggestedVisitMinutes + ' min' : '') + ' — ' + (stop.extract || '').slice(0, 240);
+      li.appendChild(description);
+      const preview = document.createElement('button');
+      preview.className = 'secondary';
+      preview.textContent = 'Hear story';
+      preview.addEventListener('click', async () => {
+        try {
+          const script = await generateNarrationScript(stop.title, 0, 'at this stop', stop.extract, 'If the source is brief, avoid inventing history or details; introduce this as a visitor attraction.');
+          document.getElementById('poiTitle').textContent = stop.title;
+          document.getElementById('poiScript').textContent = script;
+          await speakText(script);
+        } catch (error) { curatedStatus('Could not play story: ' + error.message); }
+      });
+      li.appendChild(preview);
+      list.appendChild(li);
+    });
+    root.appendChild(list);
+    for (const mode of (experience === 'driving' ? ['driving', 'walking'] : ['walking', 'driving'])) {
+      const link = document.createElement('a');
+      link.href = mapsDirectionsUrl(curatedStops, mode);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = `Open ${mode} directions in Google Maps`;
+      link.style.display = 'block';
+      link.style.margin = '12px 0';
+      root.appendChild(link);
+    }
+    const note = document.createElement('p');
+    note.className = 'setting-hint';
+    note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Driving optimization is used for the stop order, so walking route order may differ. Suggested visit durations are estimates, not travel times.';
+    root.appendChild(note);
+  }
+  async function buildSelectedCuratedRoute() {
+    curatedStops = curatedCandidates.filter(p => curatedSelected.has(String(p.pageid)));
+    if (curatedStops.length < 2) { curatedStatus('Select at least two destinations to build a route.'); renderCuratedTour(); return; }
+    if (curatedStops.length > 20) { curatedStatus('Please select no more than 20 stops for Google Maps routing.'); return; }
+    curatedStatus('Optimizing driving route for your selected stops...');
+    try {
+      const coords = curatedStops.map(p => p.lon + ',' + p.lat).join(';');
+      const res = await fetchTourResource('https://router.project-osrm.org/trip/v1/driving/' + coords + '?roundtrip=false&source=first&destination=last&overview=false', {}, 6500);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.code === 'Ok' && data.waypoints?.length === curatedStops.length && data.waypoints.every(p => Number.isInteger(p.waypoint_index)))
+          curatedStops = curatedStops.map((p,i) => ({...p, order:data.waypoints[i].waypoint_index})).sort((a,b)=>a.order-b.order);
+      }
+    } catch (error) { log('Route optimization unavailable: ' + error.message); }
+    renderCuratedTour();
+    curatedStatus('Route ready with ' + curatedStops.length + ' selected stops.');
+  }
+  const CURATED_STYLE_TERMS = {
+    highlights: ['best tourist attractions landmarks', 'must see scenic overlooks parks', 'famous museums science centers', 'iconic neighborhoods markets stadiums inclines'],
+    history: ['historic landmarks museums', 'famous historic sites', 'heritage museums monuments'],
+    scenic: ['scenic overlooks viewpoints parks', 'waterfront gardens nature attractions', 'landmark bridges'],
+    family: ['family attractions science centers', 'zoos aquariums museums', 'parks family activities']
+  };
+  const CURATED_STYLE_MATCH = {
+    highlights: /incline|funicular|overlook|viewpoint|market|district|park|stadium|ballpark|science|bridge|museum|riverfront|landmark|historic/i,
+    history: /history|historic|museum|fort|memorial|heritage|monument|battle|architecture/i,
+    scenic: /view|overlook|incline|park|garden|river|bridge|scenic|mountain/i,
+    family: /science|museum|zoo|aquarium|park|children|family|planetarium|stadium/i
+  };
+  // A small verified benchmark list, not the primary discovery source. Other cities
+  // use the same generic search, Wikipedia geolocation, and visitor-interest scoring.
+  const CITY_HIGHLIGHT_HINTS = {
+    'pittsburgh': [
+      'Duquesne Incline', 'Monongahela Incline', 'Point State Park',
+      'Mount Washington (Pittsburgh)', 'Grandview Avenue (Pittsburgh)', 'Grandview Overlook', 'Mount Washington overlooks',
+      'PNC Park', 'Kamin Science Center', 'Carnegie Science Center',
+      'Strip District, Pittsburgh', 'Senator John Heinz History Center',
+      'The Andy Warhol Museum', 'Roberto Clemente Bridge'
+    ]
+  };
+  const MIN_HIGHLIGHT_SCORE = 105;
+  const HIGHLIGHT_BUILDING_PATTERN = /\b(building|tower|office|headquarters|skyscraper|commercial block|bank building|historic district|residence|house|apartments|condominiums|hotel)\b/i;
+  const HIGHLIGHT_EXPERIENCE_PATTERN = /\b(incline|funicular|overlook|viewpoint|panorama|scenic|park|market|stadium|ballpark|museum|science center|zoo|aquarium|garden|riverfront|bridge|landmark)\b/i;
+  // Ordinary educational facilities are not visitor attractions. Keep established
+  // campus landmarks, museums, gardens, and historic visitor experiences.
+  const EDUCATIONAL_FACILITY_PATTERN = /\b(university|college|community college|technical college|school|academy|institute of technology|campus|student center|student union|lecture hall|academic building|education center|learning center|research center|faculty building|department of|school of)\b/i;
+  const EDUCATIONAL_VISITOR_EXCEPTION = /\b(cathedral of learning|nationality rooms|heinz memorial chapel|robie house|museum|gallery|botanical garden|conservatory|planetarium|observatory|historic house|historic landmark|architecture tour)\b/i;
+  // A tour should not recommend a whole city center, generic plaza, or
+  // ordinary commercial property as if it were a distinctive attraction.
+  // Apply to live discovery across every tour style; editorial catalog entries
+  // are separately reviewed and can include genuinely notable public spaces.
+  const GENERIC_DOWNTOWN_PATTERN = /^(?:(?:downtown|central business district|city center|city centre|financial district|business district)(?: of)?(?:[ ,—-]+(?:pittsburgh|chicago|san diego))?|(?:pittsburgh|chicago|san diego)[ ,—-]+(?:downtown|city center|city centre|central business district))$/i;
+  const LOW_VALUE_PLAZA_PATTERN = /\b(plaza|office plaza|corporate plaza|commercial plaza|shopping plaza|office complex|business center|business centre|corporate center|corporate centre|office tower|office building|commercial building|commercial block|parking structure|parking garage)\b/i;
+  const NOTABLE_PUBLIC_SPACE_PATTERN = /\b(market square|union square|times square|millennium park|daley plaza|pioneer courthouse square|rockefeller center|civic center plaza)\b/i;
+  const ORDINARY_BUILDING_PATTERN = /\b(building|office tower|office complex|commercial block|headquarters|condominium|apartments|residential tower|bank building|corporate center)\b/i;
+  const NOTABLE_BUILDING_PATTERN = /\b(cathedral of learning|chicago cultural center|chicago theatre|willis tower|skydeck|360 chicago|observation deck|historic house|museum|gallery|conservatory|landmark tour|architecture tour)\b/i;
+  const LOW_VALUE_ATTRACTION_PATTERN = /\b(parking|garage|restroom|toilet|playground|picnic area|bus stop|transit stop|office|apartment|condominium|warehouse|gas station|car wash|storage|loading dock|utility|maintenance|gift shop|souvenir|visitor center|information kiosk)\b/i;
+  const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
+  async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try { return await fetch(url, {...options, signal: controller.signal}); }
+    finally { clearTimeout(timer); }
+  }
+  async function generateCuratedTour() {
+    if (narrationMode() !== 'premium') {
+      curatedStatus('Switch to Premium testing mode to build a curated tour.');
+      return;
+    }
+    const button = document.getElementById('curatedGenerateBtn');
+    button.disabled = true;
+    curatedStops = [];
+    curatedCandidates = [];
+    curatedSelected.clear();
+    renderCuratedTour();
+    try {
+      curatedStatus('Locating town and discovering landmarks...');
+      const area = document.getElementById('curatedArea').value.trim();
+      const center = area ? await Promise.race([geocodePlace(area), new Promise((_, reject) => setTimeout(() => reject(new Error('Town lookup timed out. Try a more specific place name.')), 10000))]) : await Promise.race([getCurrentGpsPromise(), new Promise((_, reject) => setTimeout(() => reject(new Error('GPS location timed out. Enter a town name instead.')), 12000))]);
+      curatedAreaName = center.name;
+      const radius = Number(document.getElementById('curatedRadius').value);
+      const count = Number(document.getElementById('curatedStops').value);
+      const style = document.getElementById('curatedStyle').value;
+      const experience = document.getElementById('curatedExperience').value;
+      const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${Math.min(radius,10000)}&gslimit=50&format=json&origin=*`;
+      curatedStatus('Searching nearby attractions (step 1 of 4)...');
+      const geoRes = await fetchTourResource(url, {}, 9000);
+      if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
+      let geo = (await geoRes.json()).query?.geosearch || [];
+      // Supplement distance-only results with historically significant destinations.
+      const searches = (CURATED_STYLE_TERMS[style] || CURATED_STYLE_TERMS.highlights).map(term => curatedAreaName + ' ' + term);
+      if (style === 'highlights' && /pittsburgh/i.test(area || curatedAreaName)) searches.unshift('Mount Washington Pittsburgh scenic overlook Grandview Avenue');
+      const cityKey = (area || curatedAreaName).toLowerCase().split(',')[0].trim();
+      const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
+      const discoveredTitles = new Set();
+      let cachedAttractions = [];
+      const catalogSlug = ({'pittsburgh':'pittsburgh','chicago':'chicago','san diego':'san-diego'})[cityKey];
+      if (catalogSlug) {
+        try {
+          const catalogResponse = await fetchTourResource('./data/' + catalogSlug + '-pois.json', {cache:'no-cache'}, 3500);
+          if (catalogResponse.ok) {
+            const catalog = await catalogResponse.json();
+            cachedAttractions = (catalog.attractions || []).filter(p =>
+              Number.isFinite(p.lat) && Number.isFinite(p.lon) &&
+              haversineMeters(center.lat,center.lon,p.lat,p.lon) <= radius
+            ).map(p => ({
+              pageid:p.id,title:p.name,lat:p.lat,lon:p.lon,
+              dist:haversineMeters(center.lat,center.lon,p.lat,p.lon),
+              extract:p.description,category:p.category,curated:true,
+              visitorAppeal:p.visitorAppeal,visitType:p.visitType,suggestedVisitMinutes:p.suggestedVisitMinutes
+            }));
+          }
+        } catch (error) { log('Curated city catalog unavailable: ' + error.message); }
+      }
+      curatedStatus('Finding popular visitor destinations (step 2 of 4)...');
+      const searchResults = await Promise.all(searches.map(async term => {
+        try {
+          const response = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(term) + '&srlimit=12&format=json&origin=*', {}, 4500);
+          return response.ok ? ((await response.json()).query?.search || []).map(p => p.title) : [];
+        } catch (error) { log('Additional discovery unavailable: ' + error.message); return []; }
+      }));
+      searchResults.flat().forEach(title => discoveredTitles.add(title));
+      localHints.forEach(title => discoveredTitles.add(title));
+      if (discoveredTitles.size) {
+        try {
+          const lookup = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...localHints, ...discoveredTitles].filter((title,index,arr)=>arr.indexOf(title)===index).slice(0, 45).join('|')) + '&format=json&origin=*', {}, 8000);
+          if (lookup.ok) {
+            const pages = Object.values((await lookup.json()).query?.pages || {});
+            const known = new Set(geo.map(p => p.pageid));
+            for (const page of pages) {
+              const point = page.coordinates?.[0];
+              if (!point || known.has(page.pageid)) continue;
+              const dist = haversineMeters(center.lat, center.lon, point.lat, point.lon);
+              if (dist > radius) continue;
+              geo.push({pageid: page.pageid, title: page.title, lat: point.lat, lon: point.lon, dist, extract: page.extract || '', discovered: true});
+              known.add(page.pageid);
+            }
+          }
+        } catch (error) { log('Discovery enrichment unavailable: ' + error.message); }
+      }
+      // OSM is optional; Wikipedia remains the primary discovery source.
+      // OSM points supplement encyclopedic records with attractions like viewpoints,
+      // market districts and tourism destinations that have little Wikipedia coverage.
+      curatedStatus('Checking optional map attractions (step 3 of 4; up to 4 seconds)...');
+      const osmCandidates = [];
+      try {
+        const osmRadius = Math.min(radius, 8000);
+        const query = '[out:json][timeout:12];(nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
+        const osmRes = await fetchTourResource('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {}, 4000);
+        if (osmRes.ok) {
+          const elements = (await osmRes.json()).elements || [];
+          for (const item of elements) {
+            const tags = item.tags || {};
+            const name = tags.name || '';
+            const lat = item.lat ?? item.center?.lat;
+            const lon = item.lon ?? item.center?.lon;
+            if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (/parking|restroom|toilet|playground|picnic|bus stop/i.test(name)) continue;
+            const category = tags.tourism || tags.historic || tags.leisure || tags.shop || 'attraction';
+            osmCandidates.push({pageid:'osm-' + item.type + '-' + item.id,title:name,lat,lon,dist:haversineMeters(center.lat,center.lon,lat,lon),extract:tags.description || tags['description:en'] || ('Visitor attraction: ' + name + '. Category: ' + category + '.'),osm:true,category});
+          }
+        }
+      } catch (error) { /* Optional source unavailable; continue with Wikipedia candidates. */ }
+      if (!geo.length && !osmCandidates.length && !cachedAttractions.length) throw new Error('No attractions found in this area.');
+      curatedStatus('Ranking destinations (step 4 of 4)...');
+      const ids = geo.map(p => p.pageid).filter(id => typeof id === 'number').slice(0, 90).join('|');
+      let pages = {};
+      if (ids) {
+        const detailsRes = await fetchTourResource(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`, {}, 8000);
+        if (detailsRes.ok) pages = (await detailsRes.json()).query?.pages || {};
+      }
+      const combined = [...cachedAttractions, ...geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || ''})), ...osmCandidates];
+      const deduped = new Map();
+      for (const p of combined) {
+        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
+        if (p.dist > radius) continue;
+        if (isGenericPlace(p.title, p.extract) && !p.osm && !p.curated) continue;
+        if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
+        if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
+        if (GENERIC_DOWNTOWN_PATTERN.test(p.title.trim())) continue;
+        if (!p.curated && LOW_VALUE_PLAZA_PATTERN.test(p.title) && !NOTABLE_PUBLIC_SPACE_PATTERN.test(p.title)) continue;
+        if (!p.curated && ORDINARY_BUILDING_PATTERN.test(p.title) && !NOTABLE_BUILDING_PATTERN.test(p.title)) continue;
+        // Apply across all tour styles: a school's historical mention alone
+        // should not turn an ordinary campus facility into a sightseeing stop.
+        if (!p.curated && EDUCATIONAL_FACILITY_PATTERN.test(p.title) && !EDUCATIONAL_VISITOR_EXCEPTION.test(p.title)) continue;
+        if (style === 'highlights' && (LOW_VALUE_ATTRACTION_PATTERN.test(p.title) || /\b(firstside|fourth avenue) historic district\b/i.test(p.title))) continue;
+        if (style === 'highlights' && HIGHLIGHT_BUILDING_PATTERN.test(p.title) && !HIGHLIGHT_EXPERIENCE_PATTERN.test(p.title)) continue;
+        const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
+        const previous = deduped.get(key);
+        if (!previous || (p.curated && !previous.curated) || (!p.osm && previous.osm && !previous.curated)) deduped.set(key, p);
+      }
+      const candidates = [...deduped.values()].map(p => {
+        const normalized = p.title.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, '');
+        const iconic = localHints.some(name => { const hint = name.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, ''); return hint === normalized || (hint.length > 9 && (normalized.includes(hint) || hint.includes(normalized))); }) ? 170 : 0;
+        const visitor = CURATED_STYLE_MATCH[style]?.test(p.title + ' ' + p.category) ? 35 : 0;
+        const wiki = p.osm ? 0 : Math.min((p.extract || '').length / 60, 18);
+        const quality = p.osm && (p.extract || '').length < 90 ? -55 : 0;
+        const vague = /^(memorial|monument|historic site|scenic view|viewpoint|park|museum|attraction|public art)$/i.test(p.title.trim()) ? -80 : 0;
+        const credible = p.curated || p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
+        const unverified = style === 'highlights' && !credible ? -75 : 0;
+        const scenicBoost = style === 'highlights' && /mount washington|grandview|scenic overlook|observation deck/i.test(p.title) ? 125 : 0;
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.curated ? 240 + 20 * (p.visitorAppeal || 0) : 0) + (p.discovered ? 25 : 0) + (experience === 'driving' ? (p.visitType === 'drive-by' ? 240 : p.visitType === 'explore' ? -75 : 0) : (p.visitType === 'explore' ? 170 : p.visitType === 'drive-by' ? -160 : 0))};
+      }).sort((a,b) => b.score - a.score);
+      // Highlights should be a varied introduction to a city, not a list of
+      // similarly named museums or monuments.
+      const balanced = [];
+      const usedTypes = new Map();
+      const typeOf = p => {
+        const t = p.title + ' ' + (p.category || '');
+        if (/incline|funicular|cable car/i.test(t)) return 'incline';
+        if (/view|overlook|mount washington/i.test(t)) return 'viewpoint';
+        if (/market|district|neighborhood/i.test(t)) return 'neighborhood';
+        if (/park|garden|riverfront/i.test(t)) return 'park';
+        if (/stadium|ballpark|arena/i.test(t)) return 'sports';
+        if (/museum|science|gallery/i.test(t)) return 'museum';
+        if (/bridge/i.test(t)) return 'architecture';
+        return 'other';
+      };
+      const pool = style === 'highlights' ? candidates.filter(p => p.score >= MIN_HIGHLIGHT_SCORE) : [...candidates];
+      while (balanced.length < count && pool.length) {
+        pool.sort((a,b) => (b.score - 70 * (usedTypes.get(typeOf(b)) || 0)) - (a.score - 70 * (usedTypes.get(typeOf(a)) || 0)));
+        const next = pool.shift();
+        balanced.push(next);
+        usedTypes.set(typeOf(next), (usedTypes.get(typeOf(next)) || 0) + 1);
+      }
+      const suggested = style === 'highlights' ? balanced : candidates.slice(0,count);
+      // Show more candidates than the requested route length. Weak options are not
+      // preselected but remain available for knowledgeable local users.
+      curatedCandidates = candidates.slice(0, Math.max(35, count * 5)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
+      curatedSelected = new Set(suggested.map(p=>String(p.pageid)));
+      renderCuratedTour();
+      curatedStatus((experience === 'driving' ? 'Scenic driving' : 'Explore the city') + ' tour: found ' + curatedCandidates.length + ' destinations (' + cachedAttractions.length + ' from the editorial city catalog). Pilot coordinates and access details are not yet verified. Choose stops, then build your route.');
+    } catch (error) {
+      curatedStatus('Could not build tour: ' + error.message);
+    } finally { button.disabled = false; }
   }
 
   // --- Offline Route Cache Helpers ---
@@ -626,7 +1043,7 @@
       const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, target.extract);
 
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
-      const distLabel = distanceMeters !== null ? `${distanceMeters}m away • ` : '';
+      const distLabel = distanceMeters !== null ? `${formatDistance(distanceMeters)} away • ` : '';
       document.getElementById('poiTitle').textContent = target.title;
       document.getElementById('poiMeta').textContent = `${capDir} • ${distLabel}Cached Route Preview`;
       document.getElementById('poiScript').textContent = script;
@@ -816,7 +1233,7 @@
     const badge = document.getElementById('statusBadge');
 
     if (!isRunning) {
-      if ((!window.ROADSIDETOUR_API_URL || !accessCodeInput.value.trim()) && document.getElementById('voice').value !== 'browser') {
+      if (!window.ROADSIDETOUR_API_URL || !accessCodeInput.value.trim()) {
         log('Hosted narration is not configured — using source summaries and Free Browser TTS.');
       }
       isRunning = true;
@@ -962,6 +1379,76 @@
     return `just behind you on your ${side}`;
   }
 
+  let lastAreaStoryAt = 0;
+  const heardAreaStories = new Set();
+  async function playAreaHistoryFallback(coords) {
+    if (!areaStoriesInput.checked || !navigator.onLine || Date.now() - lastAreaStoryAt < 600000) return;
+    try {
+      const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=10000&gslimit=50&format=json&origin=*`);
+      if (!res.ok) return;
+      const nearby = (await res.json()).query?.geosearch || [];
+      const area = nearby.find(p => /borough|city|township|homestead|strike|battle|steel|historic/i.test(p.title) && !heardAreaStories.has(p.pageid));
+      if (!area) return;
+      const ext = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${area.pageid}&format=json&origin=*`);
+      if (!ext.ok) return;
+      const extract = (await ext.json()).query?.pages?.[area.pageid]?.extract || '';
+      if (extract.length < 160) return;
+      const script = await generateNarrationScript(area.title, null, 'in the surrounding area, not necessarily visible from this road', extract, 'Prioritize documented local events, people, and labor history. Include folklore only if supported by the source. Never invent facts.');
+      document.getElementById('poiTitle').textContent = 'Local history: ' + area.title;
+      document.getElementById('poiMeta').textContent = 'Broader area story • Not a roadside sighting';
+      document.getElementById('poiScript').textContent = script;
+      heardAreaStories.add(area.pageid);
+      lastAreaStoryAt = Date.now();
+      await speakText(script);
+    } catch (err) { log('Area story unavailable: ' + err.message); }
+  }
+  // --- Experimental road-aware relevance ---
+  let lastRoadFix = null;
+  async function nearestRoad(lat, lon) {
+    const response = await fetch('https://router.project-osrm.org/nearest/v1/driving/' + lon + ',' + lat + '?number=1');
+    if (!response.ok) throw new Error('Road matching unavailable');
+    const result = await response.json();
+    const point = result.waypoints?.[0];
+    if (!point || !Array.isArray(point.location)) throw new Error('No mapped road');
+    return { lat: point.location[1], lon: point.location[0], name: (point.name || '').trim().toLowerCase(), offset: point.distance };
+  }
+  async function filterRoadsideCandidates(coords, candidates) {
+    if (!roadAwareInput.checked || !navigator.onLine || !candidates.length || (coords.speed || 0) >= 22.2) return candidates;
+    const hasHeading = Number.isFinite(coords.heading) && (coords.speed || 0) > 1.5;
+    const now = Date.now();
+    try {
+      if (!lastRoadFix || now - lastRoadFix.time > 30000 || haversineMeters(coords.latitude, coords.longitude, lastRoadFix.rawLat, lastRoadFix.rawLon) > 60) {
+        const snapped = await nearestRoad(coords.latitude, coords.longitude);
+        lastRoadFix = {...snapped, rawLat: coords.latitude, rawLon: coords.longitude, time: now};
+      }
+      const road = lastRoadFix;
+      if (road.offset > 65) { log('GPS too far from a mapped road; using distance-based selection.'); return candidates; }
+      const ranked = candidates.slice().sort((a,b) => a.dist-b.dist).slice(0,12);
+      const checks = await Promise.all(ranked.map(async candidate => {
+        try {
+          const snapped = await nearestRoad(candidate.lat, candidate.lon);
+          const sameNamedRoad = Boolean(road.name && snapped.name && road.name === snapped.name);
+          const closeToRoad = snapped.offset <= 45;
+          const roadSeparation = haversineMeters(road.lat, road.lon, snapped.lat, snapped.lon);
+          const angle = hasHeading ? Math.abs(signedAngleDifference(coords.heading, calculateBearing(coords.latitude, coords.longitude, candidate.lat, candidate.lon))) : 0;
+          // Restrict nearby city stops to the mapped current road, or a very close intersection.
+          const relevant = closeToRoad && (sameNamedRoad || (roadSeparation <= 85 && candidate.dist <= 110)) && (!hasHeading || angle <= 95);
+          return relevant ? {...candidate, roadRelevant: true, roadMatch: sameNamedRoad} : null;
+        } catch (error) { return null; }
+      }));
+      const matching = checks.filter(Boolean);
+      if (matching.length) {
+        log('Road-aware: ' + matching.length + ' nearby landmark(s) matched the road or an immediate intersection.');
+        return matching;
+      }
+      log('Road-aware: no nearby sites confirmed on this road; skipping distant/off-street candidates.');
+      return [];
+    } catch (error) {
+      log('Road matching unavailable; falling back to proximity and direction: ' + error.message);
+      return candidates;
+    }
+  }
+
   // --- Core Pipeline ---
   async function checkNearbyLandmarks(coords) {
     if (isProcessing) return;
@@ -994,7 +1481,7 @@
           return;
         }
         const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=${radius}&gslimit=25&format=json&origin=*`;
-        log(`Querying live Wikipedia within ${radius}m...`);
+        log(`Querying live Wikipedia within ${formatDistance(radius)}...`);
         const res = await fetch(wikiUrl);
         const data = await res.json();
         const results = data?.query?.geosearch || [];
@@ -1007,6 +1494,7 @@
 
       if (candidates.length === 0) {
         log('No unheard landmarks in the selected categories and range.');
+        await playAreaHistoryFallback(coords);
         return;
       }
 
@@ -1019,14 +1507,20 @@
         if (ahead.length > 0) {
           candidates = ahead;
           log(`Filtered to ${ahead.length} landmarks ahead of travel direction.`);
-        } else if (coords.speed >= 22.2) {
+        } else if (coords.speed >= 2.2) {
           log('No selected-category landmarks ahead in the current highway range.');
           return;
         }
       }
 
+      candidates = await filterRoadsideCandidates(coords, candidates);
+      if (!candidates.length) {
+        await playAreaHistoryFallback(coords);
+        return;
+      }
+
       // Prefer documented, widely recognized sites while keeping nearby stops competitive.
-      candidates.sort((a, b) => scoreLandmark(b, radius) - scoreLandmark(a, radius) || a.dist - b.dist);
+      candidates.sort((a, b) => (scoreLandmark(b, radius) - b.dist / 3 + (b.roadMatch ? 35 : 0)) - (scoreLandmark(a, radius) - a.dist / 3 + (a.roadMatch ? 35 : 0)) || a.dist - b.dist);
 
       let target = null;
       let extract = '';
@@ -1061,6 +1555,7 @@
         log(skippedByCategory
           ? 'Nearby entries did not match the selected site categories.'
           : 'No qualifying, well-documented landmarks found in this scan.');
+        await playAreaHistoryFallback(coords);
         return;
       }
 
@@ -1070,17 +1565,17 @@
       const relativeDir = broadArea
         ? (hasHeading ? 'in the broader area ahead' : 'in the broader area around you')
         : getRelativeDirection(coords, target.lat, target.lon);
-      log(`Selected: "${target.title}" (${distanceMeters}m, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
+      log(`Selected: "${target.title}" (${formatDistance(distanceMeters)}, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
 
       const storyPacing = candidates.length >= 4
         ? 'Several potential sites are within range, so keep this story compact and leave room for the next one.'
         : 'Few other sites appear to be nearby; a little more context is welcome only if the source has genuinely worthwhile facts.';
-      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract, storyPacing);
+      const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, extract, storyPacing + ' Emphasize documented events, notable people, and source-supported folklore. Never invent visits, legends, or anecdotes.');
 
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
       const sourceTag = target.fromCache ? 'Offline Route Cache' : 'Live Wikipedia';
       document.getElementById('poiTitle').textContent = target.title;
-      document.getElementById('poiMeta').textContent = `${capDir} • ${distanceMeters}m away • ${sourceTag}`;
+      document.getElementById('poiMeta').textContent = `${capDir} • ${formatDistance(distanceMeters)} away • ${sourceTag}`;
       document.getElementById('poiScript').textContent = script;
       updateMediaSession(target.title, script);
 
@@ -1172,12 +1667,13 @@
   }
 
   async function speakText(text) {
-    const voice = document.getElementById('voice').value;
+    const voice = voiceInput.value;
+    const selectedMode = narrationMode();
     const serviceUrl = window.ROADSIDETOUR_API_URL;
     const accessCode = accessCodeInput.value.trim();
 
-    if (voice === 'browser' || !serviceUrl || !accessCode || !navigator.onLine) {
-      log('Speaking via built-in offline browser TTS...');
+    if (selectedMode === 'free' || !serviceUrl || !accessCode || !navigator.onLine) {
+      log('Speaking via device TTS (no hosted speech API call)...');
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.02;
