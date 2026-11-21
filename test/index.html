@@ -590,7 +590,7 @@
         });
         label.appendChild(input);
         const name = document.createElement('strong');
-        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '');
+        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '') + (candidate.curated ? ' · City catalog' : '');
         label.appendChild(name);
         const detail = document.createElement('div');
         detail.className = 'setting-hint';
@@ -730,6 +730,24 @@
       const cityKey = (area || curatedAreaName).toLowerCase().split(',')[0].trim();
       const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
+      let cachedAttractions = [];
+      if (cityKey === 'pittsburgh') {
+        try {
+          const catalogResponse = await fetchTourResource('./data/pittsburgh-pois.json', {cache:'no-cache'}, 3500);
+          if (catalogResponse.ok) {
+            const catalog = await catalogResponse.json();
+            cachedAttractions = (catalog.attractions || []).filter(p =>
+              Number.isFinite(p.lat) && Number.isFinite(p.lon) &&
+              haversineMeters(center.lat,center.lon,p.lat,p.lon) <= radius
+            ).map(p => ({
+              pageid:p.id,title:p.name,lat:p.lat,lon:p.lon,
+              dist:haversineMeters(center.lat,center.lon,p.lat,p.lon),
+              extract:p.description,category:p.category,curated:true,
+              visitorAppeal:p.visitorAppeal
+            }));
+          }
+        } catch (error) { log('Curated city catalog unavailable: ' + error.message); }
+      }
       curatedStatus('Finding popular visitor destinations (step 2 of 4)...');
       const searchResults = await Promise.all(searches.map(async term => {
         try {
@@ -778,7 +796,7 @@
           }
         }
       } catch (error) { /* Optional source unavailable; continue with Wikipedia candidates. */ }
-      if (!geo.length && !osmCandidates.length) throw new Error('No attractions found in this area.');
+      if (!geo.length && !osmCandidates.length && !cachedAttractions.length) throw new Error('No attractions found in this area.');
       curatedStatus('Ranking destinations (step 4 of 4)...');
       const ids = geo.map(p => p.pageid).filter(id => typeof id === 'number').slice(0, 90).join('|');
       let pages = {};
@@ -786,19 +804,19 @@
         const detailsRes = await fetchTourResource(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`, {}, 8000);
         if (detailsRes.ok) pages = (await detailsRes.json()).query?.pages || {};
       }
-      const combined = [...geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || ''})), ...osmCandidates];
+      const combined = [...cachedAttractions, ...geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || ''})), ...osmCandidates];
       const deduped = new Map();
       for (const p of combined) {
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
         if (p.dist > radius) continue;
-        if (isGenericPlace(p.title, p.extract) && !p.osm) continue;
+        if (isGenericPlace(p.title, p.extract) && !p.osm && !p.curated) continue;
         if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
         if (style === 'highlights' && (LOW_VALUE_ATTRACTION_PATTERN.test(p.title) || /\b(firstside|fourth avenue) historic district\b/i.test(p.title))) continue;
         if (style === 'highlights' && HIGHLIGHT_BUILDING_PATTERN.test(p.title) && !HIGHLIGHT_EXPERIENCE_PATTERN.test(p.title)) continue;
         const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
         const previous = deduped.get(key);
-        if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
+        if (!previous || (p.curated && !previous.curated) || (!p.osm && previous.osm && !previous.curated)) deduped.set(key, p);
       }
       const candidates = [...deduped.values()].map(p => {
         const normalized = p.title.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, '');
@@ -807,10 +825,10 @@
         const wiki = p.osm ? 0 : Math.min((p.extract || '').length / 60, 18);
         const quality = p.osm && (p.extract || '').length < 90 ? -55 : 0;
         const vague = /^(memorial|monument|historic site|scenic view|viewpoint|park|museum|attraction|public art)$/i.test(p.title.trim()) ? -80 : 0;
-        const credible = p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
+        const credible = p.curated || p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
         const unverified = style === 'highlights' && !credible ? -75 : 0;
         const scenicBoost = style === 'highlights' && /mount washington|grandview|scenic overlook|observation deck/i.test(p.title) ? 125 : 0;
-        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.discovered ? 25 : 0)};
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.curated ? 240 + 20 * (p.visitorAppeal || 0) : 0) + (p.discovered ? 25 : 0)};
       }).sort((a,b) => b.score - a.score);
       // Highlights should be a varied introduction to a city, not a list of
       // similarly named museums or monuments.
@@ -837,7 +855,7 @@
       const suggested = style === 'highlights' ? balanced : candidates.slice(0,count);
       // Show more candidates than the requested route length. Weak options are not
       // preselected but remain available for knowledgeable local users.
-      curatedCandidates = candidates.slice(0, Math.max(25, count * 4)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
+      curatedCandidates = candidates.slice(0, Math.max(35, count * 5)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
       curatedSelected = new Set(suggested.map(p=>String(p.pageid)));
       renderCuratedTour();
       curatedStatus('Found ' + curatedCandidates.length + ' destinations. Choose stops, then build your route.');
