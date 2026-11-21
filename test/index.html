@@ -632,6 +632,8 @@
       'The Andy Warhol Museum', 'Roberto Clemente Bridge'
     ]
   };
+  const MIN_HIGHLIGHT_SCORE = 105;
+  const LOW_VALUE_ATTRACTION_PATTERN = /\b(parking|garage|restroom|toilet|playground|picnic area|bus stop|transit stop|office|apartment|condominium|warehouse|gas station|car wash|storage|loading dock|utility|maintenance|gift shop|souvenir|visitor center|information kiosk)\b/i;
   const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
   async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
     const controller = new AbortController();
@@ -728,6 +730,7 @@
         if (p.dist > radius) continue;
         if (isGenericPlace(p.title, p.extract) && !p.osm) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
+        if (style === 'highlights' && LOW_VALUE_ATTRACTION_PATTERN.test(p.title)) continue;
         const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
         const previous = deduped.get(key);
         if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
@@ -737,8 +740,11 @@
         const iconic = localHints.some(name => { const hint = name.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, ''); return hint === normalized || (hint.length > 9 && (normalized.includes(hint) || hint.includes(normalized))); }) ? 170 : 0;
         const visitor = CURATED_STYLE_MATCH[style]?.test(p.title + ' ' + p.category) ? 35 : 0;
         const wiki = p.osm ? 0 : Math.min((p.extract || '').length / 60, 18);
-        const quality = p.osm && (p.extract || '').length < 90 ? -20 : 0;
-        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + (p.discovered ? 25 : 0)};
+        const quality = p.osm && (p.extract || '').length < 90 ? -55 : 0;
+        const vague = /^(memorial|monument|historic site|scenic view|viewpoint|park|museum|attraction|public art)$/i.test(p.title.trim()) ? -80 : 0;
+        const credible = p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
+        const unverified = style === 'highlights' && !credible ? -75 : 0;
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + (p.discovered ? 25 : 0)};
       }).sort((a,b) => b.score - a.score);
       // Highlights should be a varied introduction to a city, not a list of
       // similarly named museums or monuments.
@@ -755,7 +761,7 @@
         if (/bridge/i.test(t)) return 'architecture';
         return 'other';
       };
-      const pool = [...candidates];
+      const pool = style === 'highlights' ? candidates.filter(p => p.score >= MIN_HIGHLIGHT_SCORE) : [...candidates];
       while (balanced.length < count && pool.length) {
         pool.sort((a,b) => (b.score - 70 * (usedTypes.get(typeOf(b)) || 0)) - (a.score - 70 * (usedTypes.get(typeOf(a)) || 0)));
         const next = pool.shift();
@@ -777,7 +783,7 @@
         }
       } catch (error) { log('Tour route optimization unavailable: ' + error.message); }
       renderCuratedTour();
-      curatedStatus(`Tour ready: ${curatedStops.length} stops. Review the stops and open directions to begin.`);
+      curatedStatus(`Tour ready: ${curatedStops.length} quality-screened stops${style === 'highlights' && curatedStops.length < count ? ' (fewer than requested because weaker attractions were excluded)' : ''}. Review the stops and open directions to begin.`);
     } catch (error) {
       curatedStatus('Could not build tour: ' + error.message);
     } finally { button.disabled = false; }
