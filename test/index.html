@@ -719,7 +719,7 @@
       const radius = Number(document.getElementById('curatedRadius').value);
       const count = Number(document.getElementById('curatedStops').value);
       const style = document.getElementById('curatedStyle').value;
-      const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${radius}&gslimit=50&format=json&origin=*`;
+      const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${Math.min(radius,10000)}&gslimit=50&format=json&origin=*`;
       curatedStatus('Searching nearby attractions (step 1 of 4)...');
       const geoRes = await fetchTourResource(url, {}, 9000);
       if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
@@ -781,7 +781,8 @@
       curatedStatus('Checking optional map attractions (step 3 of 4; up to 4 seconds)...');
       const osmCandidates = [];
       try {
-        const query = '[out:json][timeout:12];(nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
+        const osmRadius = Math.min(radius, 8000);
+        const query = '[out:json][timeout:12];(nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + osmRadius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
         const osmRes = await fetchTourResource('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {}, 4000);
         if (osmRes.ok) {
           const elements = (await osmRes.json()).elements || [];
