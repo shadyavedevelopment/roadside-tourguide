@@ -240,8 +240,8 @@
       <option value="scenic">Scenic views and outdoors</option>
       <option value="family">Family attractions</option>
     </select>
-    <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Build Curated Tour</button>
-    <p id="curatedStatus" class="setting-hint" role="status">Select Premium mode to build a tour.</p>
+    <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Discover Tour Stops</button>
+    <p id="curatedStatus" class="setting-hint" role="status">Select Premium mode to discover destinations.</p>
     <div id="curatedResults"></div>
   </div>
 
@@ -554,6 +554,8 @@
 
   // --- Curated town tour (premium pilot) ---
   let curatedStops = [];
+  let curatedCandidates = [];
+  let curatedSelected = new Set();
   let curatedAreaName = '';
   function curatedStatus(message) { document.getElementById('curatedStatus').textContent = message; }
   function mapsDirectionsUrl(stops, travelMode = 'driving') {
@@ -565,6 +567,44 @@
   function renderCuratedTour() {
     const root = document.getElementById('curatedResults');
     root.replaceChildren();
+    if (curatedCandidates.length) {
+      const chooser = document.createElement('div');
+      const intro = document.createElement('p');
+      intro.textContent = 'Choose your stops from the discovered destinations. Recommendations are preselected; you can add or remove any candidate.';
+      chooser.appendChild(intro);
+      const count = document.createElement('p');
+      count.className = 'setting-hint';
+      const updateCount = () => { count.textContent = curatedSelected.size + ' selected of ' + curatedCandidates.length + ' candidates'; };
+      chooser.appendChild(count);
+      for (const candidate of curatedCandidates) {
+        const label = document.createElement('label');
+        label.className = 'site-category-option';
+        label.style.display = 'block';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = curatedSelected.has(String(candidate.pageid));
+        input.addEventListener('change', () => {
+          if (input.checked) curatedSelected.add(String(candidate.pageid));
+          else curatedSelected.delete(String(candidate.pageid));
+          updateCount();
+        });
+        label.appendChild(input);
+        const name = document.createElement('strong');
+        name.textContent = ' ' + candidate.title + (candidate.recommended ? ' ★ Suggested' : '');
+        label.appendChild(name);
+        const detail = document.createElement('div');
+        detail.className = 'setting-hint';
+        detail.textContent = (candidate.extract || '').slice(0, 155);
+        label.appendChild(detail);
+        chooser.appendChild(label);
+      }
+      updateCount();
+      const build = document.createElement('button');
+      build.textContent = 'Build Route from Selected Stops';
+      build.addEventListener('click', buildSelectedCuratedRoute);
+      chooser.appendChild(build);
+      root.appendChild(chooser);
+    }
     if (!curatedStops.length) return;
     const heading = document.createElement('p');
     heading.textContent = `${curatedStops.length} selected stops around ${curatedAreaName}. Order is geographically optimized for a driving tour when routing is available.`;
@@ -609,6 +649,23 @@
     note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Walking route order may differ from driving order.';
     root.appendChild(note);
   }
+  async function buildSelectedCuratedRoute() {
+    curatedStops = curatedCandidates.filter(p => curatedSelected.has(String(p.pageid)));
+    if (curatedStops.length < 2) { curatedStatus('Select at least two destinations to build a route.'); renderCuratedTour(); return; }
+    if (curatedStops.length > 20) { curatedStatus('Please select no more than 20 stops for Google Maps routing.'); return; }
+    curatedStatus('Optimizing route for your selected stops...');
+    try {
+      const coords = curatedStops.map(p => p.lon + ',' + p.lat).join(';');
+      const res = await fetchTourResource('https://router.project-osrm.org/trip/v1/driving/' + coords + '?roundtrip=false&source=first&destination=last&overview=false', {}, 6500);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.code === 'Ok' && data.waypoints?.length === curatedStops.length && data.waypoints.every(p => Number.isInteger(p.waypoint_index)))
+          curatedStops = curatedStops.map((p,i) => ({...p, order:data.waypoints[i].waypoint_index})).sort((a,b)=>a.order-b.order);
+      }
+    } catch (error) { log('Route optimization unavailable: ' + error.message); }
+    renderCuratedTour();
+    curatedStatus('Route ready with ' + curatedStops.length + ' selected stops.');
+  }
   const CURATED_STYLE_TERMS = {
     highlights: ['best tourist attractions landmarks', 'must see scenic overlooks parks', 'famous museums science centers', 'iconic neighborhoods markets stadiums inclines'],
     history: ['historic landmarks museums', 'famous historic sites', 'heritage museums monuments'],
@@ -649,6 +706,8 @@
     const button = document.getElementById('curatedGenerateBtn');
     button.disabled = true;
     curatedStops = [];
+    curatedCandidates = [];
+    curatedSelected.clear();
     renderCuratedTour();
     try {
       curatedStatus('Locating town and discovering landmarks...');
@@ -729,8 +788,9 @@
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
         if (p.dist > radius) continue;
         if (isGenericPlace(p.title, p.extract) && !p.osm) continue;
+        if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
-        if (style === 'highlights' && LOW_VALUE_ATTRACTION_PATTERN.test(p.title)) continue;
+        if (style === 'highlights' && (LOW_VALUE_ATTRACTION_PATTERN.test(p.title) || /\b(firstside|fourth avenue) historic district\b/i.test(p.title))) continue;
         const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
         const previous = deduped.get(key);
         if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
@@ -768,22 +828,13 @@
         balanced.push(next);
         usedTypes.set(typeOf(next), (usedTypes.get(typeOf(next)) || 0) + 1);
       }
-      const selected = style === 'highlights' ? balanced : candidates.slice(0,count);
-      if (selected.length < 2) throw new Error('Too few attractions found. Try a larger radius or different tour style.');
-      curatedStops = selected;
-      curatedStatus('Optimizing driving stop order...');
-      try {
-        const coords = curatedStops.map(p => `${p.lon},${p.lat}`).join(';');
-        const routeRes = await fetchTourResource(`https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last&overview=false`, {}, 6500);
-        if (routeRes.ok) {
-          const result = await routeRes.json();
-          if (result.code === 'Ok' && result.waypoints?.length === curatedStops.length && result.waypoints.every(p => Number.isInteger(p.waypoint_index))) {
-            curatedStops = curatedStops.map((stop, i) => ({...stop, order: result.waypoints[i].waypoint_index})).sort((a,b) => a.order-b.order);
-          }
-        }
-      } catch (error) { log('Tour route optimization unavailable: ' + error.message); }
+      const suggested = style === 'highlights' ? balanced : candidates.slice(0,count);
+      // Show more candidates than the requested route length. Weak options are not
+      // preselected but remain available for knowledgeable local users.
+      curatedCandidates = candidates.slice(0, Math.max(25, count * 4)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
+      curatedSelected = new Set(suggested.map(p=>String(p.pageid)));
       renderCuratedTour();
-      curatedStatus(`Tour ready: ${curatedStops.length} quality-screened stops${style === 'highlights' && curatedStops.length < count ? ' (fewer than requested because weaker attractions were excluded)' : ''}. Review the stops and open directions to begin.`);
+      curatedStatus('Found ' + curatedCandidates.length + ' destinations. Choose stops, then build your route.');
     } catch (error) {
       curatedStatus('Could not build tour: ' + error.message);
     } finally { button.disabled = false; }
