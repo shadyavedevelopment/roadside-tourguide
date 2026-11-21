@@ -181,11 +181,14 @@
       <div>
         <label for="radius">Search Range</label>
         <select id="radius">
-          <option value="auto" selected>Automatic by speed (500 m walk · 1 km city · 8 km highway)</option>
-          <option value="500">500 m (Close range)</option>
-          <option value="1000">1,000 m (City)</option>
-          <option value="3000">3,000 m</option>
-          <option value="8000">8,000 m (Highway)</option>
+          <option value="auto" selected>Automatic (110 yd walking · 220 yd city · 0.75 mi highway)</option>
+          <option value="60">65 yards (Very close)</option>
+          <option value="100">110 yards (Walking)</option>
+          <option value="200">220 yards (City)</option>
+          <option value="400">440 yards</option>
+          <option value="805">0.5 mile</option>
+          <option value="1207">0.75 mile</option>
+          <option value="1609">1 mile</option>
         </select>
       </div>
       <div>
@@ -210,6 +213,8 @@
       </div>
       <p class="setting-hint">Choose one or more. The app favors well-known, historically significant sites nearby and skips ordinary places.</p>
     </fieldset>
+    <label class="site-category-option"><input id="areaStories" type="checkbox" /> Include broader local-history stories when no roadside landmark qualifies</label>
+    <p class="setting-hint">Off by default. Broader stories are labeled as area history, not visible roadside sites.</p>
     <div class="row">
       <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
       <button id="scanNowBtn" class="secondary" onclick="manualScan()">Scan Now</button>
@@ -223,7 +228,7 @@
     <label for="curatedArea">Town or area (blank = current GPS)</label>
     <input id="curatedArea" type="text" placeholder="e.g., Gettysburg, Pennsylvania" />
     <div class="row">
-      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="2000">2 km</option><option value="5000" selected>5 km</option><option value="10000">10 km</option></select></div>
+      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option></select></div>
       <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
     </div>
     <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Build Curated Tour</button>
@@ -347,6 +352,11 @@
   const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
   const STORAGE_KEY_CATEGORIES = 'rh_site_categories';
   const STORAGE_KEY_RADIUS = 'rh_search_radius';
+  const STORAGE_KEY_AREA = 'rh_area_stories';
+  const areaStoriesInput = document.getElementById('areaStories');
+  areaStoriesInput.checked = localStorage.getItem(STORAGE_KEY_AREA) === 'true';
+  areaStoriesInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_AREA, String(areaStoriesInput.checked)));
+  function formatDistance(m) { return m < 402 ? Math.round(m * 1.0936133) + ' yards' : (m / 1609.344).toFixed(1) + ' miles'; }
 
   const SITE_CATEGORY_RULES = {
     historic: /\b(historic|historical|architecture|architectural|national register|historic district|historic house|mansion|estate|castle|cathedral|church|courthouse|lighthouse|cemetery|plantation|ruins|archaeological|colonial|landmark)\b/i,
@@ -483,9 +493,9 @@
     if (choice !== 'auto') return Number(choice);
 
     const speed = Number.isFinite(coords?.speed) ? coords.speed : 0;
-    if (speed < 6.7) return 500;       // walking or slow local movement
-    if (speed < 22.2) return 1000;     // city streets and ordinary roads
-    return 8000;                       // expressway speeds: broader-area stories
+    if (speed < 2.2) return 100;       // walking or slow local movement
+    if (speed < 22.2) return 200;     // city streets and ordinary roads
+    return 1207; // highway
   }
 
   function isGenericPlace(title, extract = '') {
@@ -770,7 +780,7 @@
       const script = await generateNarrationScript(target.title, distanceMeters, relativeDir, target.extract);
 
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
-      const distLabel = distanceMeters !== null ? `${distanceMeters}m away • ` : '';
+      const distLabel = distanceMeters !== null ? `${formatDistance(distanceMeters)} away • ` : '';
       document.getElementById('poiTitle').textContent = target.title;
       document.getElementById('poiMeta').textContent = `${capDir} • ${distLabel}Cached Route Preview`;
       document.getElementById('poiScript').textContent = script;
@@ -1106,6 +1116,29 @@
     return `just behind you on your ${side}`;
   }
 
+  let lastAreaStoryAt = 0;
+  const heardAreaStories = new Set();
+  async function playAreaHistoryFallback(coords) {
+    if (!areaStoriesInput.checked || !navigator.onLine || Date.now() - lastAreaStoryAt < 600000) return;
+    try {
+      const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=10000&gslimit=50&format=json&origin=*`);
+      if (!res.ok) return;
+      const nearby = (await res.json()).query?.geosearch || [];
+      const area = nearby.find(p => /borough|city|township|homestead|strike|battle|steel|historic/i.test(p.title) && !heardAreaStories.has(p.pageid));
+      if (!area) return;
+      const ext = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${area.pageid}&format=json&origin=*`);
+      if (!ext.ok) return;
+      const extract = (await ext.json()).query?.pages?.[area.pageid]?.extract || '';
+      if (extract.length < 160) return;
+      const script = await generateNarrationScript(area.title, null, 'in the surrounding area, not necessarily visible from this road', extract, 'Prioritize documented local events, people, and labor history. Include folklore only if supported by the source. Never invent facts.');
+      document.getElementById('poiTitle').textContent = 'Local history: ' + area.title;
+      document.getElementById('poiMeta').textContent = 'Broader area story • Not a roadside sighting';
+      document.getElementById('poiScript').textContent = script;
+      heardAreaStories.add(area.pageid);
+      lastAreaStoryAt = Date.now();
+      await speakText(script);
+    } catch (err) { log('Area story unavailable: ' + err.message); }
+  }
   // --- Core Pipeline ---
   async function checkNearbyLandmarks(coords) {
     if (isProcessing) return;
@@ -1138,7 +1171,7 @@
           return;
         }
         const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=${radius}&gslimit=25&format=json&origin=*`;
-        log(`Querying live Wikipedia within ${radius}m...`);
+        log(`Querying live Wikipedia within ${formatDistance(radius)}...`);
         const res = await fetch(wikiUrl);
         const data = await res.json();
         const results = data?.query?.geosearch || [];
@@ -1151,6 +1184,7 @@
 
       if (candidates.length === 0) {
         log('No unheard landmarks in the selected categories and range.');
+        await playAreaHistoryFallback(coords);
         return;
       }
 
@@ -1163,14 +1197,14 @@
         if (ahead.length > 0) {
           candidates = ahead;
           log(`Filtered to ${ahead.length} landmarks ahead of travel direction.`);
-        } else if (coords.speed >= 22.2) {
+        } else if (coords.speed >= 2.2) {
           log('No selected-category landmarks ahead in the current highway range.');
           return;
         }
       }
 
       // Prefer documented, widely recognized sites while keeping nearby stops competitive.
-      candidates.sort((a, b) => scoreLandmark(b, radius) - scoreLandmark(a, radius) || a.dist - b.dist);
+      candidates.sort((a, b) => (scoreLandmark(b, radius) - b.dist / 3) - (scoreLandmark(a, radius) - a.dist / 3) || a.dist - b.dist);
 
       let target = null;
       let extract = '';
@@ -1205,6 +1239,7 @@
         log(skippedByCategory
           ? 'Nearby entries did not match the selected site categories.'
           : 'No qualifying, well-documented landmarks found in this scan.');
+        await playAreaHistoryFallback(coords);
         return;
       }
 
@@ -1214,7 +1249,7 @@
       const relativeDir = broadArea
         ? (hasHeading ? 'in the broader area ahead' : 'in the broader area around you')
         : getRelativeDirection(coords, target.lat, target.lon);
-      log(`Selected: "${target.title}" (${distanceMeters}m, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
+      log(`Selected: "${target.title}" (${formatDistance(distanceMeters)}, ${relativeDir}${target.fromCache ? ' • Cached' : ''})`);
 
       const storyPacing = candidates.length >= 4
         ? 'Several potential sites are within range, so keep this story compact and leave room for the next one.'
@@ -1224,7 +1259,7 @@
       const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
       const sourceTag = target.fromCache ? 'Offline Route Cache' : 'Live Wikipedia';
       document.getElementById('poiTitle').textContent = target.title;
-      document.getElementById('poiMeta').textContent = `${capDir} • ${distanceMeters}m away • ${sourceTag}`;
+      document.getElementById('poiMeta').textContent = `${capDir} • ${formatDistance(distanceMeters)} away • ${sourceTag}`;
       document.getElementById('poiScript').textContent = script;
       updateMediaSession(target.title, script);
 
