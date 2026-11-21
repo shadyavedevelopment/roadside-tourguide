@@ -19,7 +19,10 @@
       "description": "Millennium Park — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-2",
@@ -30,7 +33,10 @@
       "description": "Cloud Gate — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-3",
@@ -41,7 +47,10 @@
       "description": "Art Institute of Chicago — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-4",
@@ -52,7 +61,10 @@
       "description": "Chicago Riverwalk — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "chicago-5",
@@ -63,7 +75,10 @@
       "description": "Chicago Architecture Center — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-6",
@@ -74,7 +89,10 @@
       "description": "Chicago River Architecture Cruise Departure — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-7",
@@ -85,7 +103,10 @@
       "description": "Navy Pier — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-8",
@@ -96,7 +117,10 @@
       "description": "Willis Tower Skydeck — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-9",
@@ -107,7 +131,10 @@
       "description": "360 Chicago Observation Deck — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-10",
@@ -118,7 +145,10 @@
       "description": "Museum of Science and Industry — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-11",
@@ -129,7 +159,10 @@
       "description": "Field Museum — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-12",
@@ -140,7 +173,10 @@
       "description": "Shedd Aquarium — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-13",
@@ -151,7 +187,10 @@
       "description": "Adler Planetarium — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-14",
@@ -162,7 +201,10 @@
       "description": "Lincoln Park Zoo — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-15",
@@ -173,7 +215,10 @@
       "description": "Lincoln Park Conservatory — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-16",
@@ -184,7 +229,10 @@
       "description": "Chicago Cultural Center — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 5,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-17",
@@ -195,7 +243,10 @@
       "description": "Grant Park — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-18",
@@ -206,7 +257,10 @@
       "description": "Buckingham Fountain — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-19",
@@ -217,7 +271,10 @@
       "description": "Magnificent Mile — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "chicago-20",
@@ -228,7 +285,10 @@
       "description": "Wrigley Field — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "chicago-21",
@@ -239,7 +299,10 @@
       "description": "Garfield Park Conservatory — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-22",
@@ -250,7 +313,10 @@
       "description": "Chicago History Museum — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-23",
@@ -261,7 +327,10 @@
       "description": "Robie House — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "chicago-24",
@@ -272,7 +341,10 @@
       "description": "Promontory Point — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-25",
@@ -283,7 +355,10 @@
       "description": "Jackson Park — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-26",
@@ -294,7 +369,10 @@
       "description": "The 606 Bloomingdale Trail — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-27",
@@ -305,7 +383,10 @@
       "description": "National Museum of Mexican Art — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-28",
@@ -316,7 +397,10 @@
       "description": "Pullman National Historical Park — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-29",
@@ -327,7 +411,10 @@
       "description": "Oak Street Beach — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "chicago-30",
@@ -338,7 +425,10 @@
       "description": "Chicago Theatre — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "chicago-31",
@@ -349,7 +439,10 @@
       "description": "Museum of Contemporary Art Chicago — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "chicago-32",
@@ -360,7 +453,10 @@
       "description": "Chinatown Square — a notable visitor destination in the Chicago area.",
       "visitorAppeal": 4,
       "verificationStatus": "pending",
-      "visitorAccessPointVerified": false
+      "visitorAccessPointVerified": false,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     }
   ]
 }
