@@ -13,7 +13,10 @@
       "lon": -80.0185,
       "category": "scenic",
       "description": "Historic incline railway and skyline views from Mount Washington.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-2",
@@ -22,7 +25,10 @@
       "lon": -80.0087,
       "category": "scenic",
       "description": "Panoramic views of downtown Pittsburgh, the three rivers and bridges from Grandview Avenue.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "pgh-3",
@@ -31,7 +37,10 @@
       "lon": -80.0064,
       "category": "scenic",
       "description": "Historic incline connecting Station Square with Mount Washington.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-4",
@@ -40,7 +49,10 @@
       "lon": -80.0107,
       "category": "scenic",
       "description": "Downtown park at the meeting of the Allegheny and Monongahela rivers, with a landmark fountain.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-5",
@@ -49,7 +61,10 @@
       "lon": -80.0057,
       "category": "family",
       "description": "Baseball stadium with a celebrated view of the Pittsburgh skyline.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "pgh-6",
@@ -58,7 +73,10 @@
       "lon": -79.9825,
       "category": "culture",
       "description": "Historic market district with food shops, restaurants and specialty retailers.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "pgh-7",
@@ -67,7 +85,10 @@
       "lon": -80.0184,
       "category": "family",
       "description": "Hands-on science exhibits on Pittsburgh's North Shore; formerly Carnegie Science Center.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "pgh-8",
@@ -76,7 +97,10 @@
       "lon": -79.9926,
       "category": "history",
       "description": "Regional history museum in the Strip District.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-9",
@@ -85,7 +109,10 @@
       "lon": -80.0028,
       "category": "culture",
       "description": "Museum dedicated to Pittsburgh-born artist Andy Warhol.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-10",
@@ -94,7 +121,10 @@
       "lon": -79.9476,
       "category": "scenic",
       "description": "Botanical gardens and historic glasshouse in Schenley Park.",
-      "visitorAppeal": 5
+      "visitorAppeal": 5,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-11",
@@ -103,7 +133,10 @@
       "lon": -79.9505,
       "category": "family",
       "description": "Natural history museum in Oakland known for its dinosaur collections.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "pgh-12",
@@ -112,7 +145,10 @@
       "lon": -79.9507,
       "category": "culture",
       "description": "Art museum in Pittsburgh's Oakland neighborhood.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "pgh-13",
@@ -121,7 +157,10 @@
       "lon": -79.9533,
       "category": "culture",
       "description": "University of Pittsburgh landmark known for its Gothic Revival architecture and Nationality Rooms.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "pgh-14",
@@ -130,7 +169,10 @@
       "lon": -80.0108,
       "category": "family",
       "description": "Bird-focused attraction in Allegheny Commons Park.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 120
     },
     {
       "id": "pgh-15",
@@ -139,7 +181,10 @@
       "lon": -80.0042,
       "category": "scenic",
       "description": "Iconic downtown-to-North-Shore bridge near PNC Park.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     },
     {
       "id": "pgh-16",
@@ -148,7 +193,10 @@
       "lon": -80.0116,
       "category": "history",
       "description": "Museum interpreting Pittsburgh's frontier and early history at Point State Park.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-17",
@@ -157,7 +205,10 @@
       "lon": -79.9509,
       "category": "culture",
       "description": "Gothic Revival chapel on the University of Pittsburgh campus.",
-      "visitorAppeal": 3
+      "visitorAppeal": 3,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-18",
@@ -166,7 +217,10 @@
       "lon": -79.9434,
       "category": "scenic",
       "description": "Large urban park with trails and green spaces near Oakland.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-19",
@@ -175,7 +229,10 @@
       "lon": -79.9014,
       "category": "culture",
       "description": "Art and history destination on the former Frick family estate.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "explore",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 60
     },
     {
       "id": "pgh-20",
@@ -184,7 +241,10 @@
       "lon": -80.0097,
       "category": "culture",
       "description": "Colorful outdoor art environment in Pittsburgh's North Side.",
-      "visitorAppeal": 4
+      "visitorAppeal": 4,
+      "visitType": "drive-by",
+      "visitTypeBasis": "editorial-provisional",
+      "suggestedVisitMinutes": 10
     }
   ]
 }
