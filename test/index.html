@@ -230,7 +230,7 @@
     <label for="curatedArea">Town or area (blank = current GPS)</label>
     <input id="curatedArea" type="text" placeholder="e.g., Gettysburg, Pennsylvania" />
     <div class="row">
-      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option></select></div>
+      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option><option value="24140">15 miles (metro)</option><option value="48280">30 miles (metro)</option></select></div>
       <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
     </div>
     <label for="curatedStyle">Tour style</label>
@@ -731,9 +731,10 @@
       const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
       let cachedAttractions = [];
-      if (cityKey === 'pittsburgh') {
+      const catalogSlug = ({'pittsburgh':'pittsburgh','chicago':'chicago','san diego':'san-diego'})[cityKey];
+      if (catalogSlug) {
         try {
-          const catalogResponse = await fetchTourResource('./data/pittsburgh-pois.json', {cache:'no-cache'}, 3500);
+          const catalogResponse = await fetchTourResource('./data/' + catalogSlug + '-pois.json', {cache:'no-cache'}, 3500);
           if (catalogResponse.ok) {
             const catalog = await catalogResponse.json();
             cachedAttractions = (catalog.attractions || []).filter(p =>
@@ -858,7 +859,7 @@
       curatedCandidates = candidates.slice(0, Math.max(35, count * 5)).map(p => ({...p, recommended:suggested.some(q=>q.pageid===p.pageid)}));
       curatedSelected = new Set(suggested.map(p=>String(p.pageid)));
       renderCuratedTour();
-      curatedStatus('Found ' + curatedCandidates.length + ' destinations. Choose stops, then build your route.');
+      curatedStatus('Found ' + curatedCandidates.length + ' destinations (' + cachedAttractions.length + ' from the editorial city catalog). Pilot coordinates and access details are not yet verified. Choose stops, then build your route.');
     } catch (error) {
       curatedStatus('Could not build tour: ' + error.message);
     } finally { button.disabled = false; }
