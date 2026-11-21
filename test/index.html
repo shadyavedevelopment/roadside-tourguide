@@ -683,13 +683,15 @@
   const CITY_HIGHLIGHT_HINTS = {
     'pittsburgh': [
       'Duquesne Incline', 'Monongahela Incline', 'Point State Park',
-      'Mount Washington (Pittsburgh)', 'Grandview Avenue (Pittsburgh)',
+      'Mount Washington (Pittsburgh)', 'Grandview Avenue (Pittsburgh)', 'Grandview Overlook', 'Mount Washington overlooks',
       'PNC Park', 'Kamin Science Center', 'Carnegie Science Center',
       'Strip District, Pittsburgh', 'Senator John Heinz History Center',
       'The Andy Warhol Museum', 'Roberto Clemente Bridge'
     ]
   };
   const MIN_HIGHLIGHT_SCORE = 105;
+  const HIGHLIGHT_BUILDING_PATTERN = /\b(building|tower|office|headquarters|skyscraper|commercial block|bank building|historic district|residence|house|apartments|condominiums|hotel)\b/i;
+  const HIGHLIGHT_EXPERIENCE_PATTERN = /\b(incline|funicular|overlook|viewpoint|panorama|scenic|park|market|stadium|ballpark|museum|science center|zoo|aquarium|garden|riverfront|bridge|landmark)\b/i;
   const LOW_VALUE_ATTRACTION_PATTERN = /\b(parking|garage|restroom|toilet|playground|picnic area|bus stop|transit stop|office|apartment|condominium|warehouse|gas station|car wash|storage|loading dock|utility|maintenance|gift shop|souvenir|visitor center|information kiosk)\b/i;
   const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
   async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
@@ -724,6 +726,7 @@
       let geo = (await geoRes.json()).query?.geosearch || [];
       // Supplement distance-only results with historically significant destinations.
       const searches = (CURATED_STYLE_TERMS[style] || CURATED_STYLE_TERMS.highlights).map(term => curatedAreaName + ' ' + term);
+      if (style === 'highlights' && /pittsburgh/i.test(area || curatedAreaName)) searches.unshift('Mount Washington Pittsburgh scenic overlook Grandview Avenue');
       const cityKey = (area || curatedAreaName).toLowerCase().split(',')[0].trim();
       const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
@@ -753,13 +756,14 @@
           }
         } catch (error) { log('Discovery enrichment unavailable: ' + error.message); }
       }
+      // OSM is optional; Wikipedia remains the primary discovery source.
       // OSM points supplement encyclopedic records with attractions like viewpoints,
       // market districts and tourism destinations that have little Wikipedia coverage.
-      curatedStatus('Checking parks, viewpoints and local attractions (step 3 of 4; up to 5 seconds)...');
+      curatedStatus('Checking optional map attractions (step 3 of 4; up to 4 seconds)...');
       const osmCandidates = [];
       try {
         const query = '[out:json][timeout:12];(nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
-        const osmRes = await fetchTourResource('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})}, 5000);
+        const osmRes = await fetchTourResource('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query), {}, 4000);
         if (osmRes.ok) {
           const elements = (await osmRes.json()).elements || [];
           for (const item of elements) {
@@ -773,7 +777,7 @@
             osmCandidates.push({pageid:'osm-' + item.type + '-' + item.id,title:name,lat,lon,dist:haversineMeters(center.lat,center.lon,lat,lon),extract:tags.description || tags['description:en'] || ('Visitor attraction: ' + name + '. Category: ' + category + '.'),osm:true,category});
           }
         }
-      } catch (error) { log('OpenStreetMap attraction discovery unavailable: ' + error.message); }
+      } catch (error) { /* Optional source unavailable; continue with Wikipedia candidates. */ }
       if (!geo.length && !osmCandidates.length) throw new Error('No attractions found in this area.');
       curatedStatus('Ranking destinations (step 4 of 4)...');
       const ids = geo.map(p => p.pageid).filter(id => typeof id === 'number').slice(0, 90).join('|');
@@ -791,6 +795,7 @@
         if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
         if (style === 'highlights' && (LOW_VALUE_ATTRACTION_PATTERN.test(p.title) || /\b(firstside|fourth avenue) historic district\b/i.test(p.title))) continue;
+        if (style === 'highlights' && HIGHLIGHT_BUILDING_PATTERN.test(p.title) && !HIGHLIGHT_EXPERIENCE_PATTERN.test(p.title)) continue;
         const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
         const previous = deduped.get(key);
         if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
@@ -804,7 +809,8 @@
         const vague = /^(memorial|monument|historic site|scenic view|viewpoint|park|museum|attraction|public art)$/i.test(p.title.trim()) ? -80 : 0;
         const credible = p.discovered || iconic > 0 || (!p.osm && p.extract.length >= 250);
         const unverified = style === 'highlights' && !credible ? -75 : 0;
-        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + (p.discovered ? 25 : 0)};
+        const scenicBoost = style === 'highlights' && /mount washington|grandview|scenic overlook|observation deck/i.test(p.title) ? 125 : 0;
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + vague + unverified + scenicBoost + (p.discovered ? 25 : 0)};
       }).sort((a,b) => b.score - a.score);
       // Highlights should be a varied introduction to a city, not a list of
       // similarly named museums or monuments.
