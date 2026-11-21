@@ -610,7 +610,7 @@
     root.appendChild(note);
   }
   const CURATED_STYLE_TERMS = {
-    highlights: ['top attractions things to do', 'must see landmarks', 'iconic attractions', 'scenic overlooks markets parks'],
+    highlights: ['best tourist attractions landmarks', 'must see scenic overlooks parks', 'famous museums science centers', 'iconic neighborhoods markets stadiums inclines'],
     history: ['historic landmarks museums', 'famous historic sites', 'heritage museums monuments'],
     scenic: ['scenic overlooks viewpoints parks', 'waterfront gardens nature attractions', 'landmark bridges'],
     family: ['family attractions science centers', 'zoos aquariums museums', 'parks family activities']
@@ -667,16 +667,17 @@
       const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
       curatedStatus('Finding popular visitor destinations (step 2 of 4)...');
-      for (const term of searches) {
+      const searchResults = await Promise.all(searches.map(async term => {
         try {
           const response = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(term) + '&srlimit=12&format=json&origin=*', {}, 4500);
-          if (response.ok) ((await response.json()).query?.search || []).forEach(p => discoveredTitles.add(p.title));
-        } catch (error) { log('Additional discovery unavailable: ' + error.message); }
-      }
+          return response.ok ? ((await response.json()).query?.search || []).map(p => p.title) : [];
+        } catch (error) { log('Additional discovery unavailable: ' + error.message); return []; }
+      }));
+      searchResults.flat().forEach(title => discoveredTitles.add(title));
       localHints.forEach(title => discoveredTitles.add(title));
       if (discoveredTitles.size) {
         try {
-          const lookup = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...discoveredTitles].slice(0, 36).join('|')) + '&format=json&origin=*', {}, 8000);
+          const lookup = await fetchTourResource('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...localHints, ...discoveredTitles].filter((title,index,arr)=>arr.indexOf(title)===index).slice(0, 45).join('|')) + '&format=json&origin=*', {}, 8000);
           if (lookup.ok) {
             const pages = Object.values((await lookup.json()).query?.pages || {});
             const known = new Set(geo.map(p => p.pageid));
@@ -693,11 +694,11 @@
       }
       // OSM points supplement encyclopedic records with attractions like viewpoints,
       // market districts and tourism destinations that have little Wikipedia coverage.
-      curatedStatus('Checking parks, viewpoints and local attractions (step 3 of 4)...');
+      curatedStatus('Checking parks, viewpoints and local attractions (step 3 of 4; up to 5 seconds)...');
       const osmCandidates = [];
       try {
         const query = '[out:json][timeout:12];(nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
-        const osmRes = await fetchTourResource('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})}, 7000);
+        const osmRes = await fetchTourResource('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})}, 5000);
         if (osmRes.ok) {
           const elements = (await osmRes.json()).elements || [];
           for (const item of elements) {
@@ -732,14 +733,38 @@
         if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
       }
       const candidates = [...deduped.values()].map(p => {
-        const iconic = localHints.some(name => name.toLowerCase() === p.title.toLowerCase()) ? 140 : 0;
+        const normalized = p.title.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, '');
+        const iconic = localHints.some(name => { const hint = name.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, ''); return hint === normalized || (hint.length > 9 && (normalized.includes(hint) || hint.includes(normalized))); }) ? 170 : 0;
         const visitor = CURATED_STYLE_MATCH[style]?.test(p.title + ' ' + p.category) ? 35 : 0;
         const wiki = p.osm ? 0 : Math.min((p.extract || '').length / 60, 18);
         const quality = p.osm && (p.extract || '').length < 90 ? -20 : 0;
         return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + (p.discovered ? 25 : 0)};
-      }).sort((a,b) => b.score - a.score).slice(0,count);
-      if (candidates.length < 2) throw new Error('Too few attractions found. Try a larger radius or different tour style.');
-      curatedStops = candidates;
+      }).sort((a,b) => b.score - a.score);
+      // Highlights should be a varied introduction to a city, not a list of
+      // similarly named museums or monuments.
+      const balanced = [];
+      const usedTypes = new Map();
+      const typeOf = p => {
+        const t = p.title + ' ' + (p.category || '');
+        if (/incline|funicular|cable car/i.test(t)) return 'incline';
+        if (/view|overlook|mount washington/i.test(t)) return 'viewpoint';
+        if (/market|district|neighborhood/i.test(t)) return 'neighborhood';
+        if (/park|garden|riverfront/i.test(t)) return 'park';
+        if (/stadium|ballpark|arena/i.test(t)) return 'sports';
+        if (/museum|science|gallery/i.test(t)) return 'museum';
+        if (/bridge/i.test(t)) return 'architecture';
+        return 'other';
+      };
+      const pool = [...candidates];
+      while (balanced.length < count && pool.length) {
+        pool.sort((a,b) => (b.score - 70 * (usedTypes.get(typeOf(b)) || 0)) - (a.score - 70 * (usedTypes.get(typeOf(a)) || 0)));
+        const next = pool.shift();
+        balanced.push(next);
+        usedTypes.set(typeOf(next), (usedTypes.get(typeOf(next)) || 0) + 1);
+      }
+      const selected = style === 'highlights' ? balanced : candidates.slice(0,count);
+      if (selected.length < 2) throw new Error('Too few attractions found. Try a larger radius or different tour style.');
+      curatedStops = selected;
       curatedStatus('Optimizing driving stop order...');
       try {
         const coords = curatedStops.map(p => `${p.lon},${p.lat}`).join(';');
