@@ -233,6 +233,13 @@
       <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="1609">1 mile</option><option value="4828" selected>3 miles</option><option value="8047">5 miles</option></select></div>
       <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
     </div>
+    <label for="curatedStyle">Tour style</label>
+    <select id="curatedStyle">
+      <option value="highlights" selected>City highlights — iconic visitor experiences</option>
+      <option value="history">History and culture</option>
+      <option value="scenic">Scenic views and outdoors</option>
+      <option value="family">Family attractions</option>
+    </select>
     <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Build Curated Tour</button>
     <p id="curatedStatus" class="setting-hint" role="status">Select Premium mode to build a tour.</p>
     <div id="curatedResults"></div>
@@ -577,7 +584,7 @@
       preview.textContent = 'Hear story';
       preview.addEventListener('click', async () => {
         try {
-          const script = await generateNarrationScript(stop.title, 0, 'at this stop', stop.extract);
+          const script = await generateNarrationScript(stop.title, 0, 'at this stop', stop.extract, 'If the source is brief, avoid inventing history or details; introduce this as a visitor attraction.');
           document.getElementById('poiTitle').textContent = stop.title;
           document.getElementById('poiScript').textContent = script;
           await speakText(script);
@@ -602,6 +609,30 @@
     note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Walking route order may differ from driving order.';
     root.appendChild(note);
   }
+  const CURATED_STYLE_TERMS = {
+    highlights: ['top attractions things to do', 'must see landmarks', 'iconic attractions', 'scenic overlooks markets parks'],
+    history: ['historic landmarks museums', 'famous historic sites', 'heritage museums monuments'],
+    scenic: ['scenic overlooks viewpoints parks', 'waterfront gardens nature attractions', 'landmark bridges'],
+    family: ['family attractions science centers', 'zoos aquariums museums', 'parks family activities']
+  };
+  const CURATED_STYLE_MATCH = {
+    highlights: /incline|funicular|overlook|viewpoint|market|district|park|stadium|ballpark|science|bridge|museum|riverfront|landmark|historic/i,
+    history: /history|historic|museum|fort|memorial|heritage|monument|battle|architecture/i,
+    scenic: /view|overlook|incline|park|garden|river|bridge|scenic|mountain/i,
+    family: /science|museum|zoo|aquarium|park|children|family|planetarium|stadium/i
+  };
+  // A small verified benchmark list, not the primary discovery source. Other cities
+  // use the same generic search, Wikipedia geolocation, and visitor-interest scoring.
+  const CITY_HIGHLIGHT_HINTS = {
+    'pittsburgh': [
+      'Duquesne Incline', 'Monongahela Incline', 'Point State Park',
+      'Mount Washington (Pittsburgh)', 'Grandview Avenue (Pittsburgh)',
+      'PNC Park', 'Kamin Science Center', 'Carnegie Science Center',
+      'Strip District, Pittsburgh', 'Senator John Heinz History Center',
+      'The Andy Warhol Museum', 'Roberto Clemente Bridge'
+    ]
+  };
+  const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
   async function generateCuratedTour() {
     if (narrationMode() !== 'premium') {
       curatedStatus('Switch to Premium testing mode to build a curated tour.');
@@ -618,12 +649,15 @@
       curatedAreaName = center.name;
       const radius = Number(document.getElementById('curatedRadius').value);
       const count = Number(document.getElementById('curatedStops').value);
+      const style = document.getElementById('curatedStyle').value;
       const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${radius}&gslimit=50&format=json&origin=*`;
       const geoRes = await fetch(url);
       if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
       let geo = (await geoRes.json()).query?.geosearch || [];
       // Supplement distance-only results with historically significant destinations.
-      const searches = [curatedAreaName + ' historic landmarks', curatedAreaName + ' museums attractions', curatedAreaName + ' famous historical sites'];
+      const searches = (CURATED_STYLE_TERMS[style] || CURATED_STYLE_TERMS.highlights).map(term => curatedAreaName + ' ' + term);
+      const cityKey = (area || curatedAreaName).toLowerCase().split(',')[0].trim();
+      const localHints = CITY_HIGHLIGHT_HINTS[cityKey] || [];
       const discoveredTitles = new Set();
       for (const term of searches) {
         try {
@@ -631,6 +665,7 @@
           if (response.ok) ((await response.json()).query?.search || []).forEach(p => discoveredTitles.add(p.title));
         } catch (error) { log('Additional discovery unavailable: ' + error.message); }
       }
+      localHints.forEach(title => discoveredTitles.add(title));
       if (discoveredTitles.size) {
         try {
           const lookup = await fetch('https://en.wikipedia.org/w/api.php?action=query&prop=coordinates|extracts&exintro=1&explaintext=1&titles=' + encodeURIComponent([...discoveredTitles].slice(0, 36).join('|')) + '&format=json&origin=*');
@@ -648,16 +683,52 @@
           }
         } catch (error) { log('Discovery enrichment unavailable: ' + error.message); }
       }
-      if (!geo.length) throw new Error('No Wikipedia landmarks found in this area.');
-      const ids = geo.map(p => p.pageid).slice(0, 90).join('|');
-      const detailsRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`);
-      if (!detailsRes.ok) throw new Error('Wikipedia landmark details unavailable.');
-      const pages = (await detailsRes.json()).query?.pages || {};
-      const candidates = geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || '', lon: p.lon, lat: p.lat}))
-        .filter(p => p.extract.length >= 90 && !isGenericPlace(p.title, p.extract) && matchesSelectedSiteCategories(p.title, p.extract))
-        .map(p => ({...p, score: scoreLandmark(p, radius) + (p.discovered ? 35 : 0)}))
-        .sort((a,b) => b.score - a.score).slice(0, count);
-      if (candidates.length < 2) throw new Error('Too few well-documented landmarks matched your categories. Try a larger radius or more categories.');
+      // OSM points supplement encyclopedic records with attractions like viewpoints,
+      // market districts and tourism destinations that have little Wikipedia coverage.
+      const osmCandidates = [];
+      try {
+        const query = '[out:json][timeout:12];(nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[tourism~"^(attraction|viewpoint|museum|gallery|zoo|aquarium)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[leisure~"^(park|garden)$"];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[historic];nwr(around:' + radius + ',' + center.lat + ',' + center.lon + ')[shop=marketplace];);out center 100;';
+        const osmRes = await fetch('https://overpass.kumi.systems/api/interpreter', {method:'POST', body: new URLSearchParams({data:query})});
+        if (osmRes.ok) {
+          const elements = (await osmRes.json()).elements || [];
+          for (const item of elements) {
+            const tags = item.tags || {};
+            const name = tags.name || '';
+            const lat = item.lat ?? item.center?.lat;
+            const lon = item.lon ?? item.center?.lon;
+            if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (/parking|restroom|toilet|playground|picnic|bus stop/i.test(name)) continue;
+            const category = tags.tourism || tags.historic || tags.leisure || tags.shop || 'attraction';
+            osmCandidates.push({pageid:'osm-' + item.type + '-' + item.id,title:name,lat,lon,dist:haversineMeters(center.lat,center.lon,lat,lon),extract:tags.description || tags['description:en'] || ('Visitor attraction: ' + name + '. Category: ' + category + '.'),osm:true,category});
+          }
+        }
+      } catch (error) { log('OpenStreetMap attraction discovery unavailable: ' + error.message); }
+      if (!geo.length && !osmCandidates.length) throw new Error('No attractions found in this area.');
+      const ids = geo.map(p => p.pageid).filter(id => typeof id === 'number').slice(0, 90).join('|');
+      let pages = {};
+      if (ids) {
+        const detailsRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`);
+        if (detailsRes.ok) pages = (await detailsRes.json()).query?.pages || {};
+      }
+      const combined = [...geo.map(p => ({...p, extract: pages[p.pageid]?.extract || p.extract || ''})), ...osmCandidates];
+      const deduped = new Map();
+      for (const p of combined) {
+        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
+        if (p.dist > radius) continue;
+        if (isGenericPlace(p.title, p.extract) && !p.osm) continue;
+        if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
+        const key = p.title.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/(pittsburgh|the)/g,'');
+        const previous = deduped.get(key);
+        if (!previous || (!p.osm && previous.osm)) deduped.set(key, p);
+      }
+      const candidates = [...deduped.values()].map(p => {
+        const iconic = localHints.some(name => name.toLowerCase() === p.title.toLowerCase()) ? 140 : 0;
+        const visitor = CURATED_STYLE_MATCH[style]?.test(p.title + ' ' + p.category) ? 35 : 0;
+        const wiki = p.osm ? 0 : Math.min((p.extract || '').length / 60, 18);
+        const quality = p.osm && (p.extract || '').length < 90 ? -20 : 0;
+        return {...p, score: scoreLandmark(p,radius) + iconic + visitor + wiki + quality + (p.discovered ? 25 : 0)};
+      }).sort((a,b) => b.score - a.score).slice(0,count);
+      if (candidates.length < 2) throw new Error('Too few attractions found. Try a larger radius or different tour style.');
       curatedStops = candidates;
       curatedStatus('Optimizing driving stop order...');
       try {
