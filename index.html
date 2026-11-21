@@ -216,6 +216,21 @@
     </div>
   </div>
 
+  <!-- Curated local tour (premium pilot) -->
+  <div class="card" id="curatedTourCard">
+    <div class="card-header"><span>Curated Town Tour</span><span class="pill-offline">Premium pilot</span></div>
+    <p class="setting-hint">Discover significant local sites, review the proposed stops, then open turn-by-turn directions in Maps. This beta uses Wikipedia landmark information and routing services; confirm access and opening hours independently.</p>
+    <label for="curatedArea">Town or area (blank = current GPS)</label>
+    <input id="curatedArea" type="text" placeholder="e.g., Gettysburg, Pennsylvania" />
+    <div class="row">
+      <div><label for="curatedRadius">Area radius</label><select id="curatedRadius"><option value="2000">2 km</option><option value="5000" selected>5 km</option><option value="10000">10 km</option></select></div>
+      <div><label for="curatedStops">Stops</label><select id="curatedStops"><option value="4">4 stops</option><option value="6" selected>6 stops</option><option value="8">8 stops</option></select></div>
+    </div>
+    <button id="curatedGenerateBtn" onclick="generateCuratedTour()">Build Curated Tour</button>
+    <p id="curatedStatus" class="setting-hint" role="status">Select Premium mode to build a tour.</p>
+    <div id="curatedResults"></div>
+  </div>
+
   <!-- Offline Route Pre-Loader Card -->
   <div class="card">
     <div class="card-header">
@@ -348,6 +363,8 @@
   function narrationMode() { return modeInputs.find(input => input.checked)?.value || 'free'; }
   function updateModeUi() {
     voiceInput.disabled = narrationMode() !== 'premium';
+    const curatedButton = document.getElementById('curatedGenerateBtn');
+    if (curatedButton) curatedButton.disabled = narrationMode() !== 'premium';
     voiceInput.title = voiceInput.disabled ? 'Choose Premium to enable hosted voices.' : '';
   }
   const savedMode = localStorage.getItem(STORAGE_KEY_MODE);
@@ -510,6 +527,112 @@
       ? Math.max(0, 30 * (1 - Math.min(item.dist / Math.max(radiusMeters, 1), 1)))
       : 0;
     return importance + proximity;
+  }
+
+  // --- Curated town tour (premium pilot) ---
+  let curatedStops = [];
+  let curatedAreaName = '';
+  function curatedStatus(message) { document.getElementById('curatedStatus').textContent = message; }
+  function mapsDirectionsUrl(stops, travelMode = 'driving') {
+    const location = stop => `${stop.lat},${stop.lon}`;
+    const params = new URLSearchParams({ api: '1', origin: location(stops[0]), destination: location(stops[stops.length - 1]), travelmode: travelMode });
+    if (stops.length > 2) params.set('waypoints', stops.slice(1, -1).map(location).join('|'));
+    return 'https://www.google.com/maps/dir/?' + params.toString();
+  }
+  function renderCuratedTour() {
+    const root = document.getElementById('curatedResults');
+    root.replaceChildren();
+    if (!curatedStops.length) return;
+    const heading = document.createElement('p');
+    heading.textContent = `${curatedStops.length} selected stops around ${curatedAreaName}. Order is geographically optimized for a driving tour when routing is available.`;
+    root.appendChild(heading);
+    const list = document.createElement('ol');
+    curatedStops.forEach(stop => {
+      const li = document.createElement('li');
+      const title = document.createElement('strong');
+      title.textContent = stop.title;
+      li.appendChild(title);
+      const description = document.createElement('p');
+      description.className = 'setting-hint';
+      description.textContent = (stop.extract || '').slice(0, 240);
+      li.appendChild(description);
+      const preview = document.createElement('button');
+      preview.className = 'secondary';
+      preview.textContent = 'Hear story';
+      preview.addEventListener('click', async () => {
+        try {
+          const script = await generateNarrationScript(stop.title, 0, 'at this stop', stop.extract);
+          document.getElementById('poiTitle').textContent = stop.title;
+          document.getElementById('poiScript').textContent = script;
+          await speakText(script);
+        } catch (error) { curatedStatus('Could not play story: ' + error.message); }
+      });
+      li.appendChild(preview);
+      list.appendChild(li);
+    });
+    root.appendChild(list);
+    for (const mode of ['driving', 'walking']) {
+      const link = document.createElement('a');
+      link.href = mapsDirectionsUrl(curatedStops, mode);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = `Open ${mode} directions in Google Maps`;
+      link.style.display = 'block';
+      link.style.margin = '12px 0';
+      root.appendChild(link);
+    }
+    const note = document.createElement('p');
+    note.className = 'setting-hint';
+    note.textContent = 'Navigation opens in Google Maps; the app does not yet provide its own turn-by-turn directions. Walking route order may differ from driving order.';
+    root.appendChild(note);
+  }
+  async function generateCuratedTour() {
+    if (narrationMode() !== 'premium') {
+      curatedStatus('Switch to Premium testing mode to build a curated tour.');
+      return;
+    }
+    const button = document.getElementById('curatedGenerateBtn');
+    button.disabled = true;
+    curatedStops = [];
+    renderCuratedTour();
+    try {
+      curatedStatus('Locating town and discovering landmarks...');
+      const area = document.getElementById('curatedArea').value.trim();
+      const center = area ? await geocodePlace(area) : await getCurrentGpsPromise();
+      curatedAreaName = center.name;
+      const radius = Number(document.getElementById('curatedRadius').value);
+      const count = Number(document.getElementById('curatedStops').value);
+      const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${center.lat}|${center.lon}&gsradius=${radius}&gslimit=50&format=json&origin=*`;
+      const geoRes = await fetch(url);
+      if (!geoRes.ok) throw new Error('Wikipedia landmark search failed.');
+      const geo = (await geoRes.json()).query?.geosearch || [];
+      if (!geo.length) throw new Error('No Wikipedia landmarks found in this area.');
+      const ids = geo.map(p => p.pageid).join('|');
+      const detailsRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${ids}&format=json&origin=*`);
+      if (!detailsRes.ok) throw new Error('Wikipedia landmark details unavailable.');
+      const pages = (await detailsRes.json()).query?.pages || {};
+      const candidates = geo.map(p => ({...p, extract: pages[p.pageid]?.extract || '', lon: p.lon, lat: p.lat}))
+        .filter(p => p.extract.length >= 90 && !isGenericPlace(p.title, p.extract) && matchesSelectedSiteCategories(p.title, p.extract))
+        .map(p => ({...p, score: scoreLandmark(p, radius)}))
+        .sort((a,b) => b.score - a.score).slice(0, count);
+      if (candidates.length < 2) throw new Error('Too few well-documented landmarks matched your categories. Try a larger radius or more categories.');
+      curatedStops = candidates;
+      curatedStatus('Optimizing driving stop order...');
+      try {
+        const coords = curatedStops.map(p => `${p.lon},${p.lat}`).join(';');
+        const routeRes = await fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last&overview=false`);
+        if (routeRes.ok) {
+          const result = await routeRes.json();
+          if (result.code === 'Ok' && result.waypoints?.length === curatedStops.length && result.waypoints.every(p => Number.isInteger(p.waypoint_index))) {
+            curatedStops = curatedStops.map((stop, i) => ({...stop, order: result.waypoints[i].waypoint_index})).sort((a,b) => a.order-b.order);
+          }
+        }
+      } catch (error) { log('Tour route optimization unavailable: ' + error.message); }
+      renderCuratedTour();
+      curatedStatus(`Tour ready: ${curatedStops.length} stops. Review the stops and open directions to begin.`);
+    } catch (error) {
+      curatedStatus('Could not build tour: ' + error.message);
+    } finally { button.disabled = false; }
   }
 
   // --- Offline Route Cache Helpers ---
