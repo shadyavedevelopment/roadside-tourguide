@@ -171,6 +171,12 @@
       <input type="password" id="accessCode" placeholder="Enter the code shared by the app owner" autocomplete="current-password" />
       <p class="setting-hint">The shared test code connects to Roadside Tourguide’s hosted narration service. Your OpenAI API key stays on the server.</p>
     </div>
+    <fieldset class="site-category-settings">
+      <legend>Testing narration mode</legend>
+      <label class="site-category-option"><input type="radio" name="narrationMode" value="free" checked /> Free — AI stories + device voice (no hosted speech charge)</label>
+      <label class="site-category-option"><input type="radio" name="narrationMode" value="premium" /> Premium — AI stories + hosted natural voice</label>
+      <p class="setting-hint">Both modes use AI storytelling and require the tester access code and internet. Premium uses paid hosted speech. Your choice is saved on this device.</p>
+    </fieldset>
     <div class="row">
       <div>
         <label for="radius">Search Range</label>
@@ -183,12 +189,11 @@
         </select>
       </div>
       <div>
-        <label for="voice">Narrator Voice</label>
+        <label for="voice">Premium narrator voice</label>
         <select id="voice">
           <option value="onyx">Onyx (Deep Storyteller)</option>
           <option value="nova" selected>Nova (Warm Guide)</option>
           <option value="fable">Fable (Expressive)</option>
-          <option value="browser">Free Browser TTS ($0 / Offline)</option>
         </select>
       </div>
     </div>
@@ -321,6 +326,7 @@
   let currentAudioBlobUrl = null;
 
   const STORAGE_KEY_ACCESS = 'rh_tourguide_access_code';
+  const STORAGE_KEY_MODE = 'rh_narration_mode';
   const STORAGE_KEY_HEARD = 'rh_heard_pageids';
   const STORAGE_KEY_CACHE = 'rh_route_cache';
   const STORAGE_KEY_ROUTE_META = 'rh_route_meta';
@@ -337,6 +343,21 @@
   };
 
   const accessCodeInput = document.getElementById('accessCode');
+  const voiceInput = document.getElementById('voice');
+  const modeInputs = [...document.querySelectorAll('input[name="narrationMode"]')];
+  function narrationMode() { return modeInputs.find(input => input.checked)?.value || 'free'; }
+  function updateModeUi() {
+    voiceInput.disabled = narrationMode() !== 'premium';
+    voiceInput.title = voiceInput.disabled ? 'Choose Premium to enable hosted voices.' : '';
+  }
+  const savedMode = localStorage.getItem(STORAGE_KEY_MODE);
+  if (savedMode === 'premium') modeInputs.find(input => input.value === 'premium').checked = true;
+  modeInputs.forEach(input => input.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEY_MODE, narrationMode());
+    updateModeUi();
+    log(`Narration mode selected: ${narrationMode()}. Applies to the next story.`);
+  }));
+  updateModeUi();
   const audioPlayer = document.getElementById('audioPlayer');
   const logBox = document.getElementById('logBox');
   const radiusInput = document.getElementById('radius');
@@ -816,7 +837,7 @@
     const badge = document.getElementById('statusBadge');
 
     if (!isRunning) {
-      if ((!window.ROADSIDETOUR_API_URL || !accessCodeInput.value.trim()) && document.getElementById('voice').value !== 'browser') {
+      if (!window.ROADSIDETOUR_API_URL || !accessCodeInput.value.trim()) {
         log('Hosted narration is not configured — using source summaries and Free Browser TTS.');
       }
       isRunning = true;
@@ -1172,12 +1193,13 @@
   }
 
   async function speakText(text) {
-    const voice = document.getElementById('voice').value;
+    const voice = voiceInput.value;
+    const selectedMode = narrationMode();
     const serviceUrl = window.ROADSIDETOUR_API_URL;
     const accessCode = accessCodeInput.value.trim();
 
-    if (voice === 'browser' || !serviceUrl || !accessCode || !navigator.onLine) {
-      log('Speaking via built-in offline browser TTS...');
+    if (selectedMode === 'free' || !serviceUrl || !accessCode || !navigator.onLine) {
+      log('Speaking via device TTS (no hosted speech API call)...');
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.02;
