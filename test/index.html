@@ -718,6 +718,15 @@
   // campus landmarks, museums, gardens, and historic visitor experiences.
   const EDUCATIONAL_FACILITY_PATTERN = /\b(university|college|community college|technical college|school|academy|institute of technology|campus|student center|student union|lecture hall|academic building|education center|learning center|research center|faculty building|department of|school of)\b/i;
   const EDUCATIONAL_VISITOR_EXCEPTION = /\b(cathedral of learning|nationality rooms|heinz memorial chapel|robie house|museum|gallery|botanical garden|conservatory|planetarium|observatory|historic house|historic landmark|architecture tour)\b/i;
+  // A tour should not recommend a whole city center, generic plaza, or
+  // ordinary commercial property as if it were a distinctive attraction.
+  // Apply to live discovery across every tour style; editorial catalog entries
+  // are separately reviewed and can include genuinely notable public spaces.
+  const GENERIC_DOWNTOWN_PATTERN = /^(?:(?:downtown|central business district|city center|city centre|financial district|business district)(?: of)?(?:[ ,—-]+(?:pittsburgh|chicago|san diego))?|(?:pittsburgh|chicago|san diego)[ ,—-]+(?:downtown|city center|city centre|central business district))$/i;
+  const LOW_VALUE_PLAZA_PATTERN = /\b(plaza|office plaza|corporate plaza|commercial plaza|shopping plaza|office complex|business center|business centre|corporate center|corporate centre|office tower|office building|commercial building|commercial block|parking structure|parking garage)\b/i;
+  const NOTABLE_PUBLIC_SPACE_PATTERN = /\b(market square|union square|times square|millennium park|daley plaza|pioneer courthouse square|rockefeller center|civic center plaza)\b/i;
+  const ORDINARY_BUILDING_PATTERN = /\b(building|office tower|office complex|commercial block|headquarters|condominium|apartments|residential tower|bank building|corporate center)\b/i;
+  const NOTABLE_BUILDING_PATTERN = /\b(cathedral of learning|chicago cultural center|chicago theatre|willis tower|skydeck|360 chicago|observation deck|historic house|museum|gallery|conservatory|landmark tour|architecture tour)\b/i;
   const LOW_VALUE_ATTRACTION_PATTERN = /\b(parking|garage|restroom|toilet|playground|picnic area|bus stop|transit stop|office|apartment|condominium|warehouse|gas station|car wash|storage|loading dock|utility|maintenance|gift shop|souvenir|visitor center|information kiosk)\b/i;
   const DEFUNCT_VENUE_PATTERN = /\b(demolished|former arena|closed permanently|was demolished|defunct|no longer exists|demolition)\b/i;
   async function fetchTourResource(url, options = {}, timeoutMs = 7000) {
@@ -841,6 +850,9 @@
         if (isGenericPlace(p.title, p.extract) && !p.osm && !p.curated) continue;
         if (/^pittsburgh(?:,? pennsylvania)?$/i.test(p.title.trim()) || /^(?:city|town|borough|municipality) of /i.test(p.title)) continue;
         if (DEFUNCT_VENUE_PATTERN.test(p.extract) || /\b(civic arena|mellon arena)\b/i.test(p.title)) continue;
+        if (GENERIC_DOWNTOWN_PATTERN.test(p.title.trim())) continue;
+        if (!p.curated && LOW_VALUE_PLAZA_PATTERN.test(p.title) && !NOTABLE_PUBLIC_SPACE_PATTERN.test(p.title)) continue;
+        if (!p.curated && ORDINARY_BUILDING_PATTERN.test(p.title) && !NOTABLE_BUILDING_PATTERN.test(p.title)) continue;
         // Apply across all tour styles: a school's historical mention alone
         // should not turn an ordinary campus facility into a sightseeing stop.
         if (!p.curated && EDUCATIONAL_FACILITY_PATTERN.test(p.title) && !EDUCATIONAL_VISITOR_EXCEPTION.test(p.title)) continue;
