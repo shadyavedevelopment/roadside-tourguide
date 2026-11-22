@@ -215,7 +215,7 @@
     </fieldset>
     <label class="site-category-option"><input id="roadAware" type="checkbox" checked /> Prioritize landmarks on or immediately beside my current road (experimental)</label>
     <p class="setting-hint">Uses road snapping and travel direction when online. May miss sites on adjacent streets or where mapping data is incomplete.</p>
-    <label class="site-category-option"><input id="areaStories" type="checkbox" /> Include broader local-history stories when no roadside landmark qualifies</label>
+    <label class="site-category-option"><input id="areaStories" type="checkbox" checked /> Include broader local-history stories when no roadside landmark qualifies</label>
     <p class="setting-hint">Off by default. Broader stories are labeled as area history, not visible roadside sites.</p>
     <div class="row">
       <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
@@ -373,7 +373,7 @@
   roadAwareInput.checked = localStorage.getItem(STORAGE_KEY_ROAD_AWARE) !== 'false';
   roadAwareInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_ROAD_AWARE, String(roadAwareInput.checked)));
   const areaStoriesInput = document.getElementById('areaStories');
-  areaStoriesInput.checked = localStorage.getItem(STORAGE_KEY_AREA) === 'true';
+  areaStoriesInput.checked = localStorage.getItem(STORAGE_KEY_AREA) !== 'false';
   areaStoriesInput.addEventListener('change', () => localStorage.setItem(STORAGE_KEY_AREA, String(areaStoriesInput.checked)));
   function formatDistance(m) { return m < 402 ? Math.round(m * 1.0936133) + ' yards' : (m / 1609.344).toFixed(1) + ' miles'; }
 
