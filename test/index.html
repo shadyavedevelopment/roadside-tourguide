@@ -216,7 +216,7 @@
     <label class="site-category-option"><input id="roadAware" type="checkbox" checked /> Prioritize landmarks on or immediately beside my current road (experimental)</label>
     <p class="setting-hint">Uses road snapping and travel direction when online. May miss sites on adjacent streets or where mapping data is incomplete.</p>
     <label class="site-category-option"><input id="areaStories" type="checkbox" checked /> Include broader local-history stories when no roadside landmark qualifies</label>
-    <p class="setting-hint">Off by default. Broader stories are labeled as area history, not visible roadside sites.</p>
+    <p class="setting-hint">When no qualifying roadside site is available, the guide can share a concise local-area story about every 2–3 minutes. Broader stories are labeled as area history, not visible roadside sites.</p>
     <div class="row">
       <button id="toggleBtn" onclick="toggleTour()">Start Tour</button>
       <button id="scanNowBtn" class="secondary" onclick="manualScan()">Scan Now</button>
@@ -1050,6 +1050,7 @@
       updateMediaSession(target.title, script);
 
       markAsHeard(target.pageid);
+      lastNarrationAt = Date.now();
       await speakText(script);
     } catch (err) {
       log(`Preview error: ${err.message}`);
@@ -1379,26 +1380,129 @@
     return `just behind you on your ${side}`;
   }
 
-  let lastAreaStoryAt = 0;
+  const AREA_STORY_INTERVAL_MS = 150000;
+  const AREA_STORY_RETRY_MS = 60000;
+  let lastNarrationAt = 0;
+  let lastAreaStoryAttemptAt = 0;
+  let lastMunicipalityLookup = null;
   const heardAreaStories = new Set();
+
+  async function getMunicipalityName(coords) {
+    const now = Date.now();
+    if (lastMunicipalityLookup
+      && now - lastMunicipalityLookup.time < 60000
+      && haversineMeters(coords.latitude, coords.longitude, lastMunicipalityLookup.lat, lastMunicipalityLookup.lon) < 1000) {
+      return lastMunicipalityLookup.name;
+    }
+
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${coords.latitude}&lon=${coords.longitude}`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Place lookup failed (${response.status})`);
+    const result = await response.json();
+    const address = result.address || {};
+    const name = address.city || address.town || address.village || address.municipality
+      || address.borough || address.city_district || address.suburb || address.hamlet || '';
+    if (!name) return '';
+
+    lastMunicipalityLookup = { name, lat: coords.latitude, lon: coords.longitude, time: now };
+    return name;
+  }
+
+  async function getWikipediaExtracts(pageIds) {
+    if (!pageIds.length) return {};
+    const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${pageIds.join('|')}&format=json&origin=*`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Wikipedia lookup failed (${response.status})`);
+    const data = await response.json();
+    return data?.query?.pages || {};
+  }
+
+  async function getMunicipalityArticle(municipality) {
+    const exactUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(municipality)}&format=json&origin=*`;
+    const exactResponse = await fetch(exactUrl);
+    if (!exactResponse.ok) return null;
+    const exactPages = Object.values((await exactResponse.json())?.query?.pages || {});
+    const exactPage = exactPages.find(page => !page.missing && page.extract?.length >= 220
+      && page.title.toLowerCase() === municipality.toLowerCase()
+      && !/school district|school board/i.test(page.title));
+    if (exactPage && !heardAreaStories.has(exactPage.pageid)) return exactPage;
+
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srnamespace=0&srlimit=8&srsearch=${encodeURIComponent(municipality + ' history')}&format=json&origin=*`;
+    const searchResponse = await fetch(searchUrl);
+    if (!searchResponse.ok) return null;
+    const searchItems = (await searchResponse.json())?.query?.search || [];
+    const matching = searchItems.filter(item => item.title.toLowerCase().includes(municipality.toLowerCase())
+      && !heardAreaStories.has(item.pageid)
+      && !/school district|school board/i.test(item.title));
+    const pages = await getWikipediaExtracts(matching.slice(0, 8).map(item => item.pageid));
+    return matching.map(item => pages[item.pageid] || item)
+      .filter(page => page.extract?.length >= 220)
+      .sort((a, b) => scoreLandmark({ title: b.title, extract: b.extract }, 10000)
+        - scoreLandmark({ title: a.title, extract: a.extract }, 10000))[0] || null;
+  }
+
   async function playAreaHistoryFallback(coords) {
-    if (!areaStoriesInput.checked || !navigator.onLine || Date.now() - lastAreaStoryAt < 600000) return;
+    const now = Date.now();
+    if (!areaStoriesInput.checked || !navigator.onLine
+      || now - lastNarrationAt < AREA_STORY_INTERVAL_MS
+      || now - lastAreaStoryAttemptAt < AREA_STORY_RETRY_MS) return;
+    lastAreaStoryAttemptAt = now;
+
     try {
-      const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=10000&gslimit=50&format=json&origin=*`);
-      if (!res.ok) return;
-      const nearby = (await res.json()).query?.geosearch || [];
-      const area = nearby.find(p => /borough|city|township|homestead|strike|battle|steel|historic/i.test(p.title) && !heardAreaStories.has(p.pageid));
-      if (!area) return;
-      const ext = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${area.pageid}&format=json&origin=*`);
-      if (!ext.ok) return;
-      const extract = (await ext.json()).query?.pages?.[area.pageid]?.extract || '';
-      if (extract.length < 160) return;
-      const script = await generateNarrationScript(area.title, null, 'in the surrounding area, not necessarily visible from this road', extract, 'Prioritize documented local events, people, and labor history. Include folklore only if supported by the source. Never invent facts.');
-      document.getElementById('poiTitle').textContent = 'Local history: ' + area.title;
-      document.getElementById('poiMeta').textContent = 'Broader area story • Not a roadside sighting';
+      const municipality = await getMunicipalityName(coords);
+      if (!municipality) {
+        log('Area story skipped: could not identify the current municipality.');
+        return;
+      }
+
+      const selectedCategories = getSelectedSiteCategories();
+      const geoUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${coords.latitude}|${coords.longitude}&gsradius=10000&gslimit=30&format=json&origin=*`;
+      const geoResponse = await fetch(geoUrl);
+      if (!geoResponse.ok) throw new Error(`Nearby story lookup failed (${geoResponse.status})`);
+      const nearby = (await geoResponse.json())?.query?.geosearch || [];
+      const siteCandidates = nearby.filter(page => !heardAreaStories.has(page.pageid) && !isGenericPlace(page.title));
+      const sitePages = await getWikipediaExtracts(siteCandidates.slice(0, 25).map(page => page.pageid));
+      const areaSite = siteCandidates.map(page => {
+        const extract = sitePages[page.pageid]?.extract || '';
+        const distanceMeters = haversineMeters(coords.latitude, coords.longitude, page.lat, page.lon);
+        const sourceSignificance = scoreLandmark({ title: page.title, extract }, 10000);
+        const score = scoreLandmark({ title: page.title, extract, dist: distanceMeters }, 10000);
+        return { ...page, extract, distanceMeters, score, sourceSignificance };
+      }).filter(page => page.extract.length >= 220
+        && !isGenericPlace(page.title, page.extract)
+        && (selectedCategories.size === 0 || matchesSelectedSiteCategories(page.title, page.extract))
+        && page.sourceSignificance >= 8
+        && page.score >= 18)
+        .sort((a, b) => b.score - a.score || a.distanceMeters - b.distanceMeters)[0];
+
+      const municipalityPage = areaSite ? null : await getMunicipalityArticle(municipality);
+      const story = areaSite || municipalityPage;
+      if (!story || !story.extract) {
+        log(`No well-documented, unheard area story found for ${municipality}.`);
+        return;
+      }
+
+      const contextType = areaSite ? 'area_site' : 'municipality';
+      const distanceMeters = areaSite ? Math.round(areaSite.distanceMeters) : null;
+      const relativeDir = areaSite
+        ? (distanceMeters <= 800 ? 'a few blocks away' : 'nearby in the surrounding area')
+        : `currently traveling through ${municipality}`;
+      const storyPacing = areaSite
+        ? 'This is a periodic local-area filler story. Open by naming the municipality, then introduce this source-documented nearby site and one or two worthwhile facts. Keep it around 30–55 words, do not imply the site is visible, and do not pad.'
+        : 'This is a periodic municipality story. Open with “We’re currently traveling through [municipality].” Share one concrete source-backed fact about its history, people, culture, industry, or landscape. Keep it around 30–55 words and do not pad.';
+      const script = await generateNarrationScript(story.title, distanceMeters, relativeDir, story.extract, storyPacing, {
+        contextType,
+        areaName: municipality
+      });
+      document.getElementById('poiTitle').textContent = areaSite ? `Near ${municipality}: ${story.title}` : `Around ${municipality}`;
+      document.getElementById('poiMeta').textContent = areaSite
+        ? `Local-area story • ${distanceMeters <= 800 ? 'a few blocks away' : `${formatDistance(distanceMeters)} away`} • Not necessarily visible`
+        : 'Municipality story • Broader area, not a roadside sighting';
       document.getElementById('poiScript').textContent = script;
-      heardAreaStories.add(area.pageid);
-      lastAreaStoryAt = Date.now();
+      updateMediaSession(document.getElementById('poiTitle').textContent, script);
+      if (story.pageid) heardAreaStories.add(story.pageid);
+      lastNarrationAt = Date.now();
+      log(`Playing ${contextType === 'area_site' ? 'nearby site' : 'municipality'} filler for ${municipality}.`);
       await speakText(script);
     } catch (err) { log('Area story unavailable: ' + err.message); }
   }
@@ -1458,6 +1562,7 @@
       const selectedCategories = getSelectedSiteCategories();
       if (selectedCategories.size === 0) {
         log('Select at least one site category to find landmarks.');
+        await playAreaHistoryFallback(coords);
         return;
       }
 
@@ -1509,6 +1614,7 @@
           log(`Filtered to ${ahead.length} landmarks ahead of travel direction.`);
         } else if (coords.speed >= 2.2) {
           log('No selected-category landmarks ahead in the current highway range.');
+          await playAreaHistoryFallback(coords);
           return;
         }
       }
@@ -1580,6 +1686,7 @@
       updateMediaSession(target.title, script);
 
       markAsHeard(target.pageid);
+      lastNarrationAt = Date.now();
       await speakText(script);
 
     } catch (err) {
@@ -1607,10 +1714,12 @@
     return (picked.length > 0 ? picked : sentences.slice(0, 2)).join('. ') + '.';
   }
 
-  async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract, storyPacing = '') {
+  async function generateNarrationScript(title, distanceMeters, relativeDir, wikiExtract, storyPacing = '', storyContext = {}) {
     const serviceUrl = window.ROADSIDETOUR_API_URL;
     const accessCode = accessCodeInput.value.trim();
     const capDir = relativeDir.charAt(0).toUpperCase() + relativeDir.slice(1);
+    const contextType = storyContext.contextType || 'nearby_site';
+    const areaName = typeof storyContext.areaName === 'string' ? storyContext.areaName.trim() : '';
     const selectedCategories = [...getSelectedSiteCategories()]
       .map(category => SITE_CATEGORY_LABELS[category])
       .filter(Boolean);
@@ -1623,6 +1732,13 @@
       if (!navigator.onLine) missingRequirements.push('device is offline');
       log(`OpenAI narration skipped (${missingRequirements.join(', ')}); using Wikipedia fallback.`);
       const summary = cleanWikiSummary(wikiExtract);
+      if (contextType === 'municipality' && areaName) return `We're currently traveling through ${areaName}. ${summary}`;
+      if (contextType === 'area_site' && areaName) {
+        const distanceLead = Number.isFinite(distanceMeters)
+          ? (distanceMeters <= 800 ? 'a few blocks away' : `${formatDistance(distanceMeters)} away`)
+          : 'nearby';
+        return `As we travel through ${areaName}, ${title} is ${distanceLead}. ${summary}`;
+      }
       return `${capDir} is ${title}. ${summary}`;
     }
 
@@ -1641,6 +1757,8 @@
           relativeDir,
           selectedCategories,
           storyPacing,
+          contextType,
+          areaName,
           wikiExtract: wikiExtract.slice(0, 1500)
         })
       });

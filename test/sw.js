@@ -1,4 +1,4 @@
-const CACHE_NAME = 'roadside-tourguide-v9';
+const CACHE_NAME = 'roadside-test-tourguide-v10';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
@@ -18,7 +18,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const cacheNames = await caches.keys();
     await Promise.all(cacheNames
-      .filter((name) => name.startsWith('roadside-tourguide-') && name !== CACHE_NAME)
+      .filter((name) => name.startsWith('roadside-test-tourguide-') && name !== CACHE_NAME)
       .map((name) => caches.delete(name)));
     await self.clients.claim();
   })());
