@@ -1,4 +1,4 @@
-const CACHE_NAME = 'roadside-tourguide-v11';
+const CACHE_NAME = 'roadside-tourguide-v12';
 const APP_SHELL = [
   './index.html',
   './manifest.json',

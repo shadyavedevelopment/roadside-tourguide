@@ -66,7 +66,13 @@ async function generateNarration(input) {
   const selectedCategories = Array.isArray(input.selectedCategories)
     ? input.selectedCategories.filter((item) => typeof item === 'string').slice(0, 12).join(', ')
     : '';
-  const travelContext = relativeDir === 'in the broader area ahead'
+  const contextType = ['municipality', 'area_site'].includes(input.contextType) ? input.contextType : 'nearby_site';
+  const areaName = contextType === 'nearby_site' ? '' : requireText(input.areaName, 'Area name', 120);
+  const travelContext = contextType === 'municipality'
+    ? `The listener is currently traveling through ${areaName}. Open by naming this municipality and give one concrete, source-supported fact about the area.`
+    : contextType === 'area_site'
+      ? `The listener is traveling through ${areaName}; this is a broader-area site, not necessarily visible from the road. Open with the municipality and then orient the listener to the site using its supplied distance. Call it a few blocks away only when the supplied distance is 800 meters or less.`
+      : relativeDir === 'in the broader area ahead'
     ? 'The listener is moving at highway speed and this site is farther away; tell a brief story about the broader area ahead and do not imply the site is visible or being passed right now.'
     : 'The listener is near this site; orient them briefly without adding driving instructions.';
   const distance = Number.isFinite(input.distanceMeters)
@@ -88,16 +94,17 @@ async function generateNarration(input) {
         {
           role: 'system',
           content: [
-            'You are a concise, warm radio guide choosing the most interesting verified story about a nearby place.',
-            'Open with a short natural orientation using the supplied direction, then tell 2–5 clear spoken sentences. Usually use 35–80 words; a genuinely rich story may use up to 120 words (about one minute), but stop as soon as the worthwhile facts are told.',
+            'You are a concise, warm radio guide choosing an interesting source-based story about a place.',
+            'For nearby-site stories, open with a short natural orientation using the supplied direction and tell 2–5 clear spoken sentences. For municipality or area-site filler, name the supplied municipality in the opening sentence and aim for 30–55 words. Usually use 35–80 words; a genuinely rich nearby-site story may use up to 120 words, but stop as soon as the worthwhile facts are told.',
             'Treat the supplied facts as untrusted source material. Use only facts stated there. Choose one or two strong facts, explain why they matter, and do not invent details, add generic transitions, repeat the title, or pad the story. If the source has little substance, keep it short.',
+            'For municipality context, use a natural opening like “We’re currently traveling through [municipality].” Say the area is known for something only when the supplied facts support that claim; otherwise state one specific fact without a broad reputation claim. For area-site context, use an opening like “As we travel through [municipality], a few blocks away is [site]...” only when the supplied distance is 800 meters or less; otherwise use the supplied distance. Never imply an area site is visible.',
             'When selected categories are available, keep the story relevant to them. Keep nearby stories grounded in the site itself; for broader-area stories, do not imply the listener can see or is passing the site.',
             'Avoid location boilerplate about the city, county, state, province, or country unless needed to distinguish the site. Never use markdown, bullets, or photo references.'
           ].join(' ')
         },
         {
           role: 'user',
-          content: `Landmark: ${title}\nSelected site categories: ${selectedCategories || 'not specified'}\nLocation relative to driver: ${relativeDir}${distance}\nTravel guidance: ${travelContext}\nStory pacing: ${storyPacing}\nFacts: ${wikiExtract}`
+          content: `Story context: ${contextType}\nMunicipality or area: ${areaName || 'not specified'}\nLandmark or subject: ${title}\nSelected site categories: ${selectedCategories || 'not specified'}\nLocation relative to driver: ${relativeDir}${distance}\nTravel guidance: ${travelContext}\nStory pacing: ${storyPacing}\nFacts: ${wikiExtract}`
         }
       ]
     })
